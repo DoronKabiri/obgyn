@@ -179,9 +179,9 @@
     line-height: 1.8;
     color: var(--text);
   }
-  .block-content p { margin: 0 0 10px; }
+  .block-content p { margin: 0 0 10px; white-space: pre-wrap; }
   .block-content p:last-child { margin-bottom: 0; }
-  .block-content ul { margin: 8px 0 0; padding-inline-start: 22px; }
+  .block-content ul, .block-content ol { margin: 8px 0 0; padding-inline-start: 22px; }
   .block-content li { margin-bottom: 4px; }
 
   .copy-btn {
@@ -368,16 +368,28 @@
     return (g.intro || '') + (items ? '\n' + items : '');
   }
 
+  function getSignature(topic) {
+    if (topic.type === 'postpartum') return window.SIGNATURE_POSTPARTUM || window.SIGNATURE;
+    return window.SIGNATURE;
+  }
+
   function buildBlockText(topic) {
     const parts = [];
+    if (topic.template) {
+      parts.push(topic.template);
+      if (getSignature(topic)) parts.push(getSignature(topic));
+      return parts.join('\n\n');
+    }
     if (topic.discussion) parts.push(topic.discussion);
     if (topic.recommendations) parts.push(topic.recommendations);
-    parts.push(generalRecsText());
-    if (topic.warnings_intro || (topic.warnings_items || []).length) {
-      const wi = (topic.warnings_items || []).map(x => '• ' + x).join('\n');
-      parts.push((topic.warnings_intro || '') + (wi ? '\n' + wi : ''));
+    if (!topic.is_us_finding) {
+      parts.push(generalRecsText());
+      if (topic.warnings_intro || (topic.warnings_items || []).length) {
+        const wi = (topic.warnings_items || []).map(x => '• ' + x).join('\n');
+        parts.push((topic.warnings_intro || '') + (wi ? '\n' + wi : ''));
+      }
     }
-    if (window.SIGNATURE) parts.push(window.SIGNATURE);
+    if (getSignature(topic)) parts.push(getSignature(topic));
     return parts.join('\n\n');
   }
 
@@ -418,7 +430,19 @@
     }
 
     const g = window.GENERAL_RECS || {};
-    const generalRecsHtml = `
+    const showGeneral = !topic.template && !topic.is_us_finding;
+    const showWarnings = !topic.template && !topic.is_us_finding && (topic.warnings_intro || (topic.warnings_items || []).length);
+
+    const templateHtml = topic.template ? `
+      <div class="block">
+        <div class="block-header">
+          <h3 class="block-title">תבנית</h3>
+          <button class="copy-btn" data-block="template">העתק</button>
+        </div>
+        <div class="block-content"><p style="white-space: pre-wrap;">${escapeHtml(topic.template)}</p></div>
+      </div>` : '';
+
+    const generalRecsHtml = showGeneral ? `
       <div class="block">
         <div class="block-header">
           <h3 class="block-title">המלצות כלליות</h3>
@@ -428,9 +452,9 @@
           ${g.intro ? `<p>${escapeHtml(g.intro)}</p>` : ''}
           ${(g.items || []).length ? `<ol>${g.items.map(i => `<li>${escapeHtml(i)}</li>`).join('')}</ol>` : ''}
         </div>
-      </div>`;
+      </div>` : '';
 
-    const warningsHtml = (topic.warnings_intro || (topic.warnings_items || []).length) ? `
+    const warningsHtml = showWarnings ? `
       <div class="block block-warn">
         <div class="block-header">
           <h3 class="block-title">סימני אזהרה</h3>
@@ -442,10 +466,14 @@
         </div>
       </div>` : '';
 
-    const signatureHtml = window.SIGNATURE ? `
+    const sig = getSignature(topic);
+    const signatureHtml = sig ? `
       <div class="signature">
-        ${window.SIGNATURE.split('\n').map(line => `<div>${escapeHtml(line)}</div>`).join('')}
+        ${sig.split('\n').map(line => `<div>${escapeHtml(line)}</div>`).join('')}
       </div>` : '';
+
+    const showDiscussion = !topic.template && topic.discussion;
+    const showRecs = !topic.template && topic.recommendations;
 
     content.innerHTML = `
       <h2>${escapeHtml(topic.title)}</h2>
@@ -455,7 +483,9 @@
         <button class="copy-all-btn" data-action="copy-all">העתק את כל הטקסט</button>
       </div>
 
-      ${topic.discussion ? `
+      ${templateHtml}
+
+      ${showDiscussion ? `
       <div class="block">
         <div class="block-header">
           <h3 class="block-title">שיחה והסבר</h3>
@@ -464,7 +494,7 @@
         <div class="block-content"><p>${escapeHtml(topic.discussion)}</p></div>
       </div>` : ''}
 
-      ${topic.recommendations ? `
+      ${showRecs ? `
       <div class="block">
         <div class="block-header">
           <h3 class="block-title">המלצות ומעקב</h3>
@@ -488,7 +518,8 @@
       btn.addEventListener('click', () => {
         const which = btn.dataset.block;
         let text = '';
-        if (which === 'discussion') text = topic.discussion;
+        if (which === 'template') text = topic.template;
+        else if (which === 'discussion') text = topic.discussion;
         else if (which === 'recommendations') text = topic.recommendations;
         else if (which === 'general') text = generalRecsText();
         else if (which === 'warnings') {
