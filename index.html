@@ -233,6 +233,16 @@
     margin-bottom: 12px;
   }
 
+  .signature {
+    margin-top: 24px;
+    padding: 16px 26px;
+    color: var(--text);
+    font-size: 16px;
+    font-weight: 500;
+    line-height: 1.8;
+  }
+  .signature div:first-child { margin-bottom: 2px; }
+
   .disclaimer {
     margin-top: 32px;
     padding: 16px 20px;
@@ -352,14 +362,22 @@
     });
   }
 
+  function generalRecsText() {
+    const g = window.GENERAL_RECS || {};
+    const items = (g.items || []).map((x, i) => (i + 1) + '. ' + x).join('\n');
+    return (g.intro || '') + (items ? '\n' + items : '');
+  }
+
   function buildBlockText(topic) {
     const parts = [];
     if (topic.discussion) parts.push(topic.discussion);
     if (topic.recommendations) parts.push(topic.recommendations);
+    parts.push(generalRecsText());
     if (topic.warnings_intro || (topic.warnings_items || []).length) {
       const wi = (topic.warnings_items || []).map(x => '• ' + x).join('\n');
       parts.push((topic.warnings_intro || '') + (wi ? '\n' + wi : ''));
     }
+    if (window.SIGNATURE) parts.push(window.SIGNATURE);
     return parts.join('\n\n');
   }
 
@@ -399,6 +417,19 @@
       return;
     }
 
+    const g = window.GENERAL_RECS || {};
+    const generalRecsHtml = `
+      <div class="block">
+        <div class="block-header">
+          <h3 class="block-title">המלצות כלליות</h3>
+          <button class="copy-btn" data-block="general">העתק</button>
+        </div>
+        <div class="block-content">
+          ${g.intro ? `<p>${escapeHtml(g.intro)}</p>` : ''}
+          ${(g.items || []).length ? `<ol>${g.items.map(i => `<li>${escapeHtml(i)}</li>`).join('')}</ol>` : ''}
+        </div>
+      </div>`;
+
     const warningsHtml = (topic.warnings_intro || (topic.warnings_items || []).length) ? `
       <div class="block block-warn">
         <div class="block-header">
@@ -409,6 +440,11 @@
           ${topic.warnings_intro ? `<p>${escapeHtml(topic.warnings_intro)}</p>` : ''}
           ${(topic.warnings_items || []).length ? `<ul>${topic.warnings_items.map(i => `<li>${escapeHtml(i)}</li>`).join('')}</ul>` : ''}
         </div>
+      </div>` : '';
+
+    const signatureHtml = window.SIGNATURE ? `
+      <div class="signature">
+        ${window.SIGNATURE.split('\n').map(line => `<div>${escapeHtml(line)}</div>`).join('')}
       </div>` : '';
 
     content.innerHTML = `
@@ -437,7 +473,11 @@
         <div class="block-content"><p>${escapeHtml(topic.recommendations)}</p></div>
       </div>` : ''}
 
+      ${generalRecsHtml}
+
       ${warningsHtml}
+
+      ${signatureHtml}
 
       <div class="disclaimer">
         הטקסטים נכתבו לשימוש כקטעים במכתבי סיכום ביקור. התאם בכל מקרה למצבה הספציפי של המטופלת.
@@ -450,6 +490,7 @@
         let text = '';
         if (which === 'discussion') text = topic.discussion;
         else if (which === 'recommendations') text = topic.recommendations;
+        else if (which === 'general') text = generalRecsText();
         else if (which === 'warnings') {
           const items = (topic.warnings_items || []).map(x => '• ' + x).join('\n');
           text = (topic.warnings_intro || '') + (items ? '\n' + items : '');
