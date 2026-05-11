@@ -3,6 +3,9 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+<meta http-equiv="Pragma" content="no-cache">
+<meta http-equiv="Expires" content="0">
 <title>קטעי טקסט – הריון בסיכון גבוה</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -253,6 +256,83 @@
     line-height: 1.6;
   }
 
+  /* ===== Login overlay ===== */
+  #login-overlay {
+    position: fixed;
+    inset: 0;
+    background: var(--bg);
+    z-index: 100;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 20px;
+  }
+  #login-overlay.hidden { display: none; }
+  .login-card {
+    background: var(--card-bg);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 36px 32px;
+    max-width: 420px;
+    width: 100%;
+    box-shadow: 0 8px 24px rgba(0,0,0,0.06);
+  }
+  .login-card h2 {
+    color: var(--primary);
+    margin: 0 0 8px;
+    font-size: 22px;
+  }
+  .login-card .subtitle {
+    color: var(--text-muted);
+    font-size: 14px;
+    margin-bottom: 24px;
+  }
+  .login-card input[type="password"] {
+    width: 100%;
+    padding: 12px 14px;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    font-size: 16px;
+    font-family: inherit;
+    outline: none;
+    transition: border-color 0.15s;
+    margin-bottom: 12px;
+  }
+  .login-card input[type="password"]:focus { border-color: var(--primary); }
+  .login-card button {
+    width: 100%;
+    background: var(--primary);
+    color: white;
+    border: none;
+    padding: 12px 16px;
+    border-radius: 8px;
+    font-size: 15px;
+    font-weight: 500;
+    cursor: pointer;
+    font-family: inherit;
+    transition: background 0.15s;
+  }
+  .login-card button:hover { background: var(--primary-light); }
+  .login-card button:disabled { opacity: 0.6; cursor: wait; }
+  .login-error {
+    color: #b91c1c;
+    font-size: 14px;
+    margin-top: 10px;
+    min-height: 20px;
+  }
+  #logout-btn {
+    background: rgba(255,255,255,0.15);
+    color: white;
+    border: 1px solid rgba(255,255,255,0.3);
+    padding: 6px 12px;
+    border-radius: 6px;
+    font-size: 13px;
+    cursor: pointer;
+    font-family: inherit;
+    flex-shrink: 0;
+  }
+  #logout-btn:hover { background: rgba(255,255,255,0.25); }
+
   @media (max-width: 768px) {
     #menu-toggle { display: block; }
     header h1 { font-size: 16px; }
@@ -286,10 +366,21 @@
 </head>
 <body>
 
+<div id="login-overlay">
+  <form class="login-card" id="login-form">
+    <h2>קטעי טקסט · הריון בסיכון גבוה</h2>
+    <div class="subtitle">נדרשת סיסמה לכניסה.</div>
+    <input type="password" id="login-password" placeholder="סיסמה" autocomplete="current-password" autofocus required>
+    <button type="submit" id="login-btn">כניסה</button>
+    <div class="login-error" id="login-error"></div>
+  </form>
+</div>
+
 <header>
   <button id="menu-toggle" aria-label="פתח תפריט">☰</button>
   <h1>קטעי טקסט · הריון בסיכון גבוה</h1>
   <input type="search" id="search" placeholder="חיפוש נושא...">
+  <button id="logout-btn" type="button">התנתק</button>
 </header>
 
 <div class="layout">
@@ -305,9 +396,85 @@
   </main>
 </div>
 
-<script src="topics.js"></script>
+<script src="topics.enc.js?v=3"></script>
 <script>
-(function() {
+/* ===== Login & decryption ===== */
+async function decryptTopics(encryptedB64, password, iterations) {
+  const blob = Uint8Array.from(atob(encryptedB64), c => c.charCodeAt(0));
+  const salt = blob.slice(0, 16);
+  const iv = blob.slice(16, 28);
+  const ciphertext = blob.slice(28);
+  const keyMaterial = await crypto.subtle.importKey(
+    'raw', new TextEncoder().encode(password),
+    {name: 'PBKDF2'}, false, ['deriveKey']
+  );
+  const key = await crypto.subtle.deriveKey(
+    {name: 'PBKDF2', salt: salt, iterations: iterations, hash: 'SHA-256'},
+    keyMaterial,
+    {name: 'AES-GCM', length: 256},
+    false, ['decrypt']
+  );
+  const plaintextBuffer = await crypto.subtle.decrypt(
+    {name: 'AES-GCM', iv: iv}, key, ciphertext
+  );
+  return new TextDecoder().decode(plaintextBuffer);
+}
+
+function runAppCode(code) {
+  // Execute the decrypted JS (defines window.TOPICS, etc.)
+  const s = document.createElement('script');
+  s.textContent = code;
+  document.head.appendChild(s);
+}
+
+(function loginInit() {
+  const form = document.getElementById('login-form');
+  const pwField = document.getElementById('login-password');
+  const btn = document.getElementById('login-btn');
+  const errEl = document.getElementById('login-error');
+  const overlay = document.getElementById('login-overlay');
+
+  // Try auto-login from sessionStorage
+  const saved = sessionStorage.getItem('obgyn-decrypted');
+  if (saved) {
+    try {
+      runAppCode(saved);
+      overlay.classList.add('hidden');
+      initApp();
+      return;
+    } catch (e) {
+      sessionStorage.removeItem('obgyn-decrypted');
+    }
+  }
+
+  form.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const pw = pwField.value;
+    if (!pw) return;
+    btn.disabled = true;
+    btn.textContent = 'מפענח...';
+    errEl.textContent = '';
+    try {
+      const code = await decryptTopics(window.ENCRYPTED_TOPICS, pw, window.PBKDF2_ITERATIONS || 250000);
+      runAppCode(code);
+      sessionStorage.setItem('obgyn-decrypted', code);
+      overlay.classList.add('hidden');
+      initApp();
+    } catch (err) {
+      errEl.textContent = 'סיסמה שגויה. נסה שוב.';
+      btn.disabled = false;
+      btn.textContent = 'כניסה';
+      pwField.select();
+    }
+  });
+
+  document.getElementById('logout-btn').addEventListener('click', () => {
+    sessionStorage.removeItem('obgyn-decrypted');
+    location.reload();
+  });
+})();
+
+function initApp() {
   const list = document.getElementById('topic-list');
   const content = document.getElementById('content');
   const search = document.getElementById('search');
@@ -565,7 +732,7 @@
 
   renderList('');
   onHashChange();
-})();
+}
 </script>
 </body>
 </html>
