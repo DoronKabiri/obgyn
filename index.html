@@ -489,7 +489,7 @@
   </main>
 </div>
 
-<script src="topics.enc.js?v=7"></script>
+<script src="topics.enc.js?v=8"></script>
 <script>
 /* ===== Login & decryption ===== */
 async function decryptTopics(encryptedB64, password, iterations) {
@@ -596,7 +596,7 @@ const PCT_TABLES = {
     }
   },
   bpd: {
-    label: "BPD — קוטר דו-קודקודי", unit: 'מ"מ', source: "Hadlock 1991",
+    label: "BPD — קוטר דו-קודקודי", unit: 'מ״מ', source: "Hadlock 1991",
     classify: (p) => p < 10 ? {label: 'מתחת לאחוזון 10', cls: 'warn'}
                 : p > 90 ? {label: 'מעל אחוזון 90', cls: 'warn'}
                 : {label: 'בטווח התקין (10-90)', cls: ''},
@@ -613,7 +613,7 @@ const PCT_TABLES = {
     }
   },
   hc: {
-    label: "HC — היקף ראש", unit: 'מ"מ', source: "Chervenak",
+    label: "HC — היקף ראש", unit: 'מ״מ', source: "Chervenak",
     classify: (p) => p < 3 ? {label: 'מתחת לאחוזון 3 — חשד למיקרוצפליה', cls: 'warn'}
                 : p < 10 ? {label: 'אחוזון 3-10', cls: 'warn'}
                 : p <= 90 ? {label: 'בטווח התקין (10-90)', cls: ''}
@@ -632,7 +632,7 @@ const PCT_TABLES = {
     }
   },
   ac: {
-    label: "AC — היקף בטן", unit: 'מ"מ', source: "Hadlock 1984",
+    label: "AC — היקף בטן", unit: 'מ״מ', source: "Hadlock 1984",
     classify: (p) => p < 10 ? {label: 'מתחת לאחוזון 10', cls: 'warn'}
                 : p > 90 ? {label: 'מעל אחוזון 90', cls: 'warn'}
                 : {label: 'בטווח התקין (10-90)', cls: ''},
@@ -649,7 +649,7 @@ const PCT_TABLES = {
     }
   },
   fl: {
-    label: "FL — אורך עצם הירך", unit: 'מ"מ', source: "Hadlock 1984",
+    label: "FL — אורך עצם הירך", unit: 'מ״מ', source: "Hadlock 1984",
     classify: (p) => p < 10 ? {label: 'מתחת לאחוזון 10', cls: 'warn'}
                 : p > 90 ? {label: 'מעל אחוזון 90', cls: 'warn'}
                 : {label: 'בטווח התקין (10-90)', cls: ''},
