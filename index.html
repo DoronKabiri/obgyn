@@ -256,6 +256,99 @@
     line-height: 1.6;
   }
 
+  /* ===== Calculator UI ===== */
+  .calc-card {
+    background: var(--card-bg);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 22px 26px;
+    margin-bottom: 18px;
+  }
+  .calc-card h3 {
+    margin: 0 0 14px;
+    color: var(--primary);
+    font-size: 16px;
+    font-weight: 700;
+  }
+  .calc-row {
+    display: flex;
+    gap: 12px;
+    flex-wrap: wrap;
+    align-items: flex-end;
+    margin-bottom: 12px;
+  }
+  .calc-field {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    flex: 1;
+    min-width: 140px;
+  }
+  .calc-field label {
+    font-size: 13px;
+    color: var(--text-muted);
+    font-weight: 500;
+  }
+  .calc-field input, .calc-field select {
+    padding: 8px 10px;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    font-size: 15px;
+    font-family: inherit;
+    background: white;
+  }
+  .calc-field input:focus, .calc-field select:focus {
+    outline: 2px solid var(--primary-light);
+    outline-offset: -1px;
+  }
+  .calc-btn {
+    background: var(--primary);
+    color: white;
+    border: none;
+    padding: 9px 18px;
+    border-radius: 6px;
+    font-size: 14px;
+    font-weight: 500;
+    cursor: pointer;
+    font-family: inherit;
+  }
+  .calc-btn:hover { background: var(--primary-light); }
+  .calc-result {
+    margin-top: 14px;
+    padding: 14px 18px;
+    background: var(--hover);
+    border-inline-start: 3px solid var(--primary);
+    border-radius: 6px;
+    font-size: 15px;
+    line-height: 1.7;
+  }
+  .calc-result .result-line { margin-bottom: 4px; }
+  .calc-result .result-line:last-child { margin-bottom: 0; }
+  .calc-result strong { color: var(--primary); }
+  .calc-result.warn {
+    background: var(--warn-bg);
+    border-inline-start-color: #f59e0b;
+  }
+  .calc-result .copy-summary-btn {
+    margin-top: 10px;
+    background: white;
+    color: var(--primary);
+    border: 1.5px solid var(--primary);
+    padding: 6px 14px;
+    border-radius: 6px;
+    font-size: 13px;
+    cursor: pointer;
+    font-family: inherit;
+  }
+  .calc-result .copy-summary-btn:hover { background: var(--primary); color: white; }
+  .calc-result .copy-summary-btn.copied { background: var(--success); color: white; border-color: var(--success); }
+  .calc-result .copy-summary-btn.copied::before { content: "✓ "; }
+  .calc-help {
+    font-size: 12px;
+    color: var(--text-muted);
+    margin-top: 8px;
+  }
+
   /* ===== Login overlay ===== */
   #login-overlay {
     position: fixed;
@@ -396,7 +489,7 @@
   </main>
 </div>
 
-<script src="topics.enc.js?v=3"></script>
+<script src="topics.enc.js?v=7"></script>
 <script>
 /* ===== Login & decryption ===== */
 async function decryptTopics(encryptedB64, password, iterations) {
@@ -473,6 +566,344 @@ function runAppCode(code) {
     location.reload();
   });
 })();
+
+function escapeHtml(s) {
+  return String(s).replace(/[&<>"']/g, c =>
+    ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
+
+/* ===== Fetal ultrasound percentile tables =====
+   Each table maps GA week -> [p3, p10, p50, p90, p97].
+   EFW (Hadlock 1991) in grams. Others in mm. HC uses Chervenak. */
+const PCT_TABLES = {
+  efw: {
+    label: "משקל מוערך (EFW)", unit: "גרם", source: "Hadlock 1991",
+    classify: (p) => p < 3 ? {label: 'מתחת לאחוזון 3 — FGR חמור', cls: 'warn'}
+                : p < 10 ? {label: 'אחוזון 3-10 — SGA', cls: 'warn'}
+                : p <= 90 ? {label: 'תקין (AGA, 10-90)', cls: ''}
+                : p <= 97 ? {label: 'אחוזון 90-97 — LGA', cls: 'warn'}
+                : {label: 'מעל אחוזון 97 — מקרוזומיה', cls: 'warn'},
+    table: {
+      14: [70,77,93,109,116], 15: [88,97,117,137,146], 16: [110,121,146,171,183],
+      17: [136,150,181,212,226], 18: [167,185,223,261,279], 19: [205,227,273,319,341],
+      20: [248,275,331,387,414], 21: [299,331,399,467,499], 22: [359,398,478,559,598],
+      23: [426,471,568,665,711], 24: [503,556,670,784,838], 25: [589,652,785,918,981],
+      26: [685,758,913,1068,1141], 27: [791,876,1055,1234,1319], 28: [908,1004,1210,1416,1513],
+      29: [1034,1145,1379,1613,1724], 30: [1169,1294,1559,1824,1949], 31: [1313,1453,1751,2049,2189],
+      32: [1465,1621,1953,2285,2441], 33: [1622,1794,2162,2530,2703], 34: [1783,1973,2377,2781,2971],
+      35: [1946,2154,2595,3036,3244], 36: [2110,2335,2813,3291,3517], 37: [2271,2513,3028,3543,3786],
+      38: [2427,2686,3236,3786,4045], 39: [2576,2851,3435,4019,4294], 40: [2714,3004,3619,4234,4524]
+    }
+  },
+  bpd: {
+    label: "BPD — קוטר דו-קודקודי", unit: 'מ"מ', source: "Hadlock 1991",
+    classify: (p) => p < 10 ? {label: 'מתחת לאחוזון 10', cls: 'warn'}
+                : p > 90 ? {label: 'מעל אחוזון 90', cls: 'warn'}
+                : {label: 'בטווח התקין (10-90)', cls: ''},
+    table: {
+      14: [23,25,27,29,31], 15: [26,28,30,33,35], 16: [29,31,34,37,39],
+      17: [32,34,37,40,42], 18: [35,38,41,44,47], 19: [38,41,44,48,50],
+      20: [41,44,47,51,54], 21: [44,47,50,54,57], 22: [47,50,53,57,60],
+      23: [50,53,56,60,63], 24: [52,55,59,63,66], 25: [55,58,62,66,69],
+      26: [57,61,65,69,72], 27: [60,63,68,72,75], 28: [62,66,71,75,78],
+      29: [64,68,73,78,81], 30: [67,70,76,81,84], 31: [69,73,78,83,86],
+      32: [71,75,81,86,89], 33: [73,77,83,88,91], 34: [75,79,85,90,93],
+      35: [76,81,87,92,95], 36: [78,82,89,94,97], 37: [79,84,91,96,99],
+      38: [81,85,92,97,100], 39: [82,86,94,99,102], 40: [83,87,95,100,103]
+    }
+  },
+  hc: {
+    label: "HC — היקף ראש", unit: 'מ"מ', source: "Chervenak",
+    classify: (p) => p < 3 ? {label: 'מתחת לאחוזון 3 — חשד למיקרוצפליה', cls: 'warn'}
+                : p < 10 ? {label: 'אחוזון 3-10', cls: 'warn'}
+                : p <= 90 ? {label: 'בטווח התקין (10-90)', cls: ''}
+                : p <= 97 ? {label: 'אחוזון 90-97', cls: 'warn'}
+                : {label: 'מעל אחוזון 97 — חשד למקרוצפליה', cls: 'warn'},
+    table: {
+      14: [93,97,103,109,113], 15: [105,110,117,124,129], 16: [117,122,130,138,143],
+      17: [128,134,142,150,156], 18: [139,146,154,162,169], 19: [149,156,165,174,181],
+      20: [159,167,175,183,191], 21: [169,177,187,197,205], 22: [179,188,198,208,217],
+      23: [188,198,209,220,230], 24: [198,209,220,231,242], 25: [208,219,230,241,252],
+      26: [217,228,240,252,263], 27: [226,237,250,263,274], 28: [235,247,260,273,285],
+      29: [244,256,270,284,296], 30: [253,266,280,294,307], 31: [261,275,290,305,319],
+      32: [269,283,295,310,324], 33: [278,292,305,318,332], 34: [285,299,312,325,339],
+      35: [292,306,320,334,348], 36: [299,312,325,338,351], 37: [305,318,330,342,355],
+      38: [310,322,335,348,360], 39: [316,328,340,352,364], 40: [320,333,345,357,370]
+    }
+  },
+  ac: {
+    label: "AC — היקף בטן", unit: 'מ"מ', source: "Hadlock 1984",
+    classify: (p) => p < 10 ? {label: 'מתחת לאחוזון 10', cls: 'warn'}
+                : p > 90 ? {label: 'מעל אחוזון 90', cls: 'warn'}
+                : {label: 'בטווח התקין (10-90)', cls: ''},
+    table: {
+      14: [75,82,91,100,107], 15: [84,91,100,109,116], 16: [93,100,110,120,127],
+      17: [102,109,119,129,136], 18: [111,119,130,141,149], 19: [120,129,140,151,160],
+      20: [129,139,150,161,171], 21: [139,149,160,171,181], 22: [148,158,170,182,192],
+      23: [157,168,180,192,203], 24: [167,179,192,205,217], 25: [178,190,204,218,230],
+      26: [188,200,215,230,242], 27: [198,211,226,241,254], 28: [208,221,237,253,266],
+      29: [217,231,248,265,279], 30: [226,240,258,276,290], 31: [235,251,269,287,303],
+      32: [245,261,280,299,315], 33: [254,271,290,309,326], 34: [263,280,300,320,337],
+      35: [272,290,311,332,350], 36: [280,299,320,341,360], 37: [289,308,330,352,371],
+      38: [297,316,339,362,381], 39: [304,325,348,371,392], 40: [312,333,357,381,402]
+    }
+  },
+  fl: {
+    label: "FL — אורך עצם הירך", unit: 'מ"מ', source: "Hadlock 1984",
+    classify: (p) => p < 10 ? {label: 'מתחת לאחוזון 10', cls: 'warn'}
+                : p > 90 ? {label: 'מעל אחוזון 90', cls: 'warn'}
+                : {label: 'בטווח התקין (10-90)', cls: ''},
+    table: {
+      14: [12,14,16,18,20], 15: [14,16,19,22,24], 16: [17,19,22,25,27],
+      17: [20,22,25,28,30], 18: [23,25,28,31,33], 19: [26,28,31,34,36],
+      20: [28,30,33,36,39], 21: [31,33,36,39,42], 22: [34,36,39,42,45],
+      23: [36,38,41,44,47], 24: [39,41,44,47,50], 25: [41,44,47,50,53],
+      26: [43,46,49,52,55], 27: [45,48,51,54,57], 28: [47,50,54,58,61],
+      29: [49,52,56,60,63], 30: [51,54,58,62,65], 31: [53,56,60,64,67],
+      32: [55,58,62,66,69], 33: [57,60,64,68,71], 34: [58,62,66,70,73],
+      35: [60,63,67,71,74], 36: [61,64,69,73,76], 37: [63,66,71,75,78],
+      38: [64,67,72,76,79], 39: [65,68,73,77,80], 40: [66,70,75,79,82]
+    }
+  }
+};
+
+function formatDateIL(date) {
+  if (!date || isNaN(date)) return '—';
+  const d = String(date.getDate()).padStart(2, '0');
+  const m = String(date.getMonth() + 1).padStart(2, '0');
+  const y = date.getFullYear();
+  return `${d}/${m}/${y}`;
+}
+
+function daysBetween(d1, d2) {
+  return Math.floor((d2 - d1) / 86400000);
+}
+
+function todayISO() {
+  const now = new Date();
+  const offset = now.getTimezoneOffset();
+  return new Date(now.getTime() - offset * 60000).toISOString().split('T')[0];
+}
+
+function computeGAFromLMP(lmpStr, todayStr) {
+  const lmp = new Date(lmpStr + 'T00:00:00');
+  const today = new Date(todayStr + 'T00:00:00');
+  if (isNaN(lmp) || isNaN(today)) return null;
+  const diffDays = daysBetween(lmp, today);
+  if (diffDays < 0 || diffDays > 320) return null;
+  const weeks = Math.floor(diffDays / 7);
+  const days = diffDays % 7;
+  const edd = new Date(lmp.getTime() + 280 * 86400000);
+  const w38Start = new Date(lmp.getTime() + 259 * 86400000); // 37+0
+  const w38End = new Date(lmp.getTime() + 265 * 86400000);   // 37+6
+  const daysToEdd = daysBetween(today, edd);
+  return { weeks, days, edd, daysToEdd, lmp, w38Start, w38End };
+}
+
+function computeGAFromKnownGA(weeks, days, atDateStr, todayStr) {
+  const atDate = new Date(atDateStr + 'T00:00:00');
+  if (isNaN(atDate) || weeks == null || days == null) return null;
+  const gaDays = weeks * 7 + days;
+  const lmp = new Date(atDate.getTime() - gaDays * 86400000);
+  const lmpStr = lmp.toISOString().split('T')[0];
+  return computeGAFromLMP(lmpStr, todayStr);
+}
+
+function getPercentileFor(measure, value, gaWeeks, gaDays) {
+  const cfg = PCT_TABLES[measure];
+  if (!cfg) return null;
+  const tbl = cfg.table;
+  const gaDecimal = gaWeeks + gaDays / 7;
+  const lower = Math.floor(gaDecimal);
+  const upper = lower + 1;
+  if (!tbl[lower]) return null;
+  const frac = gaDecimal - lower;
+  const upTbl = tbl[upper] || tbl[lower];
+  const interp = tbl[lower].map((v, i) => v + (upTbl[i] - v) * frac);
+  return interpolatePercentile(value, interp);
+}
+
+function interpolatePercentile(value, [p3, p10, p50, p90, p97]) {
+  let p;
+  if (value < p3) p = Math.max(0.5, 3 * (value / p3));
+  else if (value < p10) p = 3 + (10 - 3) * (value - p3) / (p10 - p3);
+  else if (value < p50) p = 10 + (50 - 10) * (value - p10) / (p50 - p10);
+  else if (value < p90) p = 50 + (90 - 50) * (value - p50) / (p90 - p50);
+  else if (value < p97) p = 90 + (97 - 90) * (value - p90) / (p97 - p90);
+  else p = Math.min(99.5, 97 + (value - p97) / Math.max(1, (p97 - p90)) * 3);
+  return { percentile: p, p3, p10, p50, p90, p97 };
+}
+
+function renderCalculatorGA(content) {
+  const today = todayISO();
+  content.innerHTML = `
+    <h2>מחשבון גיל הריון + EDD</h2>
+    <div class="topic-meta">מחשבונים וכלים</div>
+
+    <div class="calc-card">
+      <h3>שיטה 1: לפי וסת אחרונה (LMP)</h3>
+      <div class="calc-row">
+        <div class="calc-field"><label>תאריך LMP</label><input type="date" id="lmp"></div>
+        <div class="calc-field"><label>תאריך הבדיקה</label><input type="date" id="today1" value="${today}"></div>
+        <button class="calc-btn" id="calc-lmp-btn">חשב</button>
+      </div>
+      <div id="ga-result-lmp"></div>
+    </div>
+
+    <div class="calc-card">
+      <h3>שיטה 2: לפי גיל הריון בתאריך נתון</h3>
+      <div class="calc-row">
+        <div class="calc-field"><label>שבועות</label><input type="number" id="ga-w" min="4" max="42" step="1" placeholder="12"></div>
+        <div class="calc-field"><label>ימים</label><input type="number" id="ga-d" min="0" max="6" step="1" value="0"></div>
+        <div class="calc-field"><label>בתאריך</label><input type="date" id="ga-at"></div>
+        <div class="calc-field"><label>תאריך הבדיקה</label><input type="date" id="today2" value="${today}"></div>
+        <button class="calc-btn" id="calc-ga-btn">חשב</button>
+      </div>
+      <div class="calc-help">לדוגמה: סקירה ראשונה בתאריך X הראתה גיל הריון 12+3 — מה ה-EDD?</div>
+      <div id="ga-result-ga"></div>
+    </div>
+  `;
+
+  function renderGAResult(elId, r, methodNote) {
+    const el = document.getElementById(elId);
+    if (!r) {
+      el.innerHTML = '<div class="calc-result warn">תאריכים לא תקינים או טווח חורג מ-0-46 שבועות.</div>';
+      return;
+    }
+    const lmpStr = formatDateIL(r.lmp);
+    const eddStr = formatDateIL(r.edd);
+    const w38a = formatDateIL(r.w38Start);
+    const w38b = formatDateIL(r.w38End);
+    const summary = `גיל הריון ${r.weeks}+${r.days}, EDD ${eddStr}, שבוע 38 (37+0 - 37+6): ${w38a} - ${w38b} [לפי ${methodNote}].`;
+    el.innerHTML = `
+      <div class="calc-result">
+        <div class="result-line"><strong>LMP:</strong> ${lmpStr}</div>
+        <div class="result-line"><strong>גיל הריון נוכחי:</strong> ${r.weeks} שבועות + ${r.days} ימים</div>
+        <div class="result-line"><strong>EDD (תאריך משוער ללידה):</strong> ${eddStr}</div>
+        <div class="result-line"><strong>שבוע 38 (37+0 → 37+6):</strong> ${w38a} - ${w38b}</div>
+        <div class="result-line"><strong>${r.daysToEdd >= 0 ? 'ימים עד EDD' : 'ימים מעבר ל-EDD'}:</strong> ${Math.abs(r.daysToEdd)}</div>
+        <button class="copy-summary-btn" data-text="${escapeHtml(summary)}">העתק לסיכום</button>
+      </div>
+    `;
+    attachCopySummary(el);
+  }
+
+  document.getElementById('calc-lmp-btn').addEventListener('click', () => {
+    const lmp = document.getElementById('lmp').value;
+    const today = document.getElementById('today1').value;
+    if (!lmp) {
+      document.getElementById('ga-result-lmp').innerHTML = '<div class="calc-result warn">יש להזין תאריך LMP.</div>';
+      return;
+    }
+    renderGAResult('ga-result-lmp', computeGAFromLMP(lmp, today), `LMP ${formatDateIL(new Date(lmp + 'T00:00:00'))}`);
+  });
+
+  document.getElementById('calc-ga-btn').addEventListener('click', () => {
+    const w = parseInt(document.getElementById('ga-w').value);
+    const d = parseInt(document.getElementById('ga-d').value) || 0;
+    const at = document.getElementById('ga-at').value;
+    const today = document.getElementById('today2').value;
+    if (isNaN(w) || !at) {
+      document.getElementById('ga-result-ga').innerHTML = '<div class="calc-result warn">יש להזין שבועות + תאריך הבדיקה.</div>';
+      return;
+    }
+    renderGAResult('ga-result-ga', computeGAFromKnownGA(w, d, at, today), `גיל הריון ${w}+${d} בתאריך ${formatDateIL(new Date(at + 'T00:00:00'))}`);
+  });
+}
+
+function renderCalculatorFWP(content) {
+  const fields = Object.entries(PCT_TABLES).map(([k, v]) => `
+    <div class="calc-row" style="margin-bottom: 8px;">
+      <div class="calc-field" style="flex: 2;">
+        <label>${v.label} <span style="color: var(--text-muted); font-weight: 400; font-size: 12px;">— ${v.source}</span></label>
+        <input type="number" id="us-v-${k}" min="0" step="0.1" placeholder="ערך ב${v.unit}">
+      </div>
+    </div>
+  `).join('');
+
+  content.innerHTML = `
+    <h2>אחוזון מדדי אולטרסאונד עוברי</h2>
+    <div class="topic-meta">מחשבונים וכלים</div>
+
+    <div class="calc-card">
+      <div class="calc-row">
+        <div class="calc-field"><label>שבועות</label><input type="number" id="us-w" min="14" max="42" step="1" placeholder="32"></div>
+        <div class="calc-field"><label>ימים</label><input type="number" id="us-d" min="0" max="6" step="1" value="0"></div>
+        <button class="calc-btn" id="calc-us-btn" style="align-self: flex-end;">חשב</button>
+      </div>
+      <div style="border-top: 1px solid var(--border); margin: 14px 0 12px; padding-top: 12px;">
+        <div style="font-size: 13px; color: var(--text-muted); margin-bottom: 10px;">הזן ערכים רק במדדים שמעניינים אותך — השאר ריקים את השאר.</div>
+        ${fields}
+      </div>
+      <div class="calc-help">טווח שבועות נתמך: 14-40. EFW, BPD, AC, FL לפי Hadlock; HC לפי Chervenak.</div>
+      <div id="us-result"></div>
+    </div>
+  `;
+
+  document.getElementById('calc-us-btn').addEventListener('click', () => {
+    const w = parseInt(document.getElementById('us-w').value);
+    const d = parseInt(document.getElementById('us-d').value) || 0;
+    const out = document.getElementById('us-result');
+    if (!w || w < 14 || w > 42) {
+      out.innerHTML = '<div class="calc-result warn">יש להזין שבועות (14-42) וימים (0-6).</div>';
+      return;
+    }
+    const results = [];
+    for (const [k, cfg] of Object.entries(PCT_TABLES)) {
+      const raw = document.getElementById(`us-v-${k}`).value;
+      if (raw === '' || raw === null) continue;
+      const v = parseFloat(raw);
+      if (isNaN(v) || v <= 0) continue;
+      const r = getPercentileFor(k, v, w, d);
+      if (!r) continue;
+      results.push({ k, cfg, v, r, cls: cfg.classify(r.percentile) });
+    }
+    if (results.length === 0) {
+      out.innerHTML = '<div class="calc-result warn">לא הוזן אף ערך. הזן ערך לפחות במדד אחד.</div>';
+      return;
+    }
+    const hasWarn = results.some(x => x.cls.cls === 'warn');
+    const round = (n, unit) => unit === 'גרם' ? Math.round(n) : Math.round(n * 10) / 10;
+    const pDisp = (p) => p < 1 ? '<1' : p > 99 ? '>99' : Math.round(p);
+
+    const resultLines = results.map(({ k, cfg, v, r, cls }) => {
+      const p = pDisp(r.percentile);
+      const cssMark = cls.cls === 'warn' ? '⚠️ ' : '';
+      return `<div class="result-line">
+        <strong>${cfg.label}:</strong> ${v} ${cfg.unit} → אחוזון <strong>${p}</strong> · ${cssMark}${cls.label}
+        <span style="color: var(--text-muted); font-size: 13px;"> (טווח 10-90: ${round(r.p10, cfg.unit)}-${round(r.p90, cfg.unit)} ${cfg.unit})</span>
+      </div>`;
+    }).join('');
+
+    const summaryLines = results.map(({ cfg, v, r }) =>
+      `${cfg.label}: ${v} ${cfg.unit} (אחוזון ${pDisp(r.percentile)})`
+    ).join('; ');
+    const summary = `מדדי אולטרסאונד בשבוע ${w}+${d}: ${summaryLines}.`;
+
+    out.innerHTML = `
+      <div class="calc-result ${hasWarn ? 'warn' : ''}">
+        <div class="result-line" style="margin-bottom: 10px;"><strong>גיל הריון:</strong> ${w}+${d}</div>
+        ${resultLines}
+        <button class="copy-summary-btn" data-text="${escapeHtml(summary)}">העתק סיכום לכל המדדים</button>
+      </div>
+    `;
+    attachCopySummary(out);
+  });
+}
+
+function attachCopySummary(parentEl) {
+  parentEl.querySelectorAll('.copy-summary-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const text = btn.getAttribute('data-text').replace(/&amp;/g,'&').replace(/&lt;/g,'<').replace(/&gt;/g,'>').replace(/&quot;/g,'"').replace(/&#39;/g,"'");
+      navigator.clipboard.writeText(text).then(() => {
+        const orig = btn.textContent;
+        btn.classList.add('copied');
+        btn.textContent = 'הועתק';
+        setTimeout(() => { btn.classList.remove('copied'); btn.textContent = orig; }, 1500);
+      });
+    });
+  });
+}
 
 function initApp() {
   const list = document.getElementById('topic-list');
@@ -596,6 +1027,19 @@ function initApp() {
       return;
     }
 
+    // Calculator topics: render with dedicated calculator UI
+    if (topic.type === 'calculator') {
+      if (topic.calc === 'ga') renderCalculatorGA(content);
+      else if (topic.calc === 'fwp') renderCalculatorFWP(content);
+      if (window.innerWidth <= 768) {
+        sidebar.classList.remove('open');
+        overlay.classList.remove('show');
+      }
+      content.scrollTo(0, 0);
+      window.scrollTo(0, 0);
+      return;
+    }
+
     const g = window.GENERAL_RECS || {};
     const showGeneral = !topic.template && !topic.is_us_finding;
     const showWarnings = !topic.template && !topic.is_us_finding && (topic.warnings_intro || (topic.warnings_items || []).length);
@@ -706,11 +1150,6 @@ function initApp() {
     }
     content.scrollTo(0, 0);
     window.scrollTo(0, 0);
-  }
-
-  function escapeHtml(s) {
-    return String(s).replace(/[&<>"']/g, c =>
-      ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
   }
 
   function onHashChange() {
