@@ -489,7 +489,7 @@
   </main>
 </div>
 
-<script src="topics.enc.js?v=8"></script>
+<script src="topics.enc.js?v=11"></script>
 <script>
 /* ===== Login & decryption ===== */
 async function decryptTopics(encryptedB64, password, iterations) {
@@ -578,11 +578,11 @@ function escapeHtml(s) {
 const PCT_TABLES = {
   efw: {
     label: "משקל מוערך (EFW)", unit: "גרם", source: "Hadlock 1991",
-    classify: (p) => p < 3 ? {label: 'מתחת לאחוזון 3 — FGR חמור', cls: 'warn'}
-                : p < 10 ? {label: 'אחוזון 3-10 — SGA', cls: 'warn'}
+    classify: (p) => p < 3 ? {label: 'מתחת לאחוזון 3, FGR חמור', cls: 'warn'}
+                : p < 10 ? {label: 'אחוזון 3-10, SGA', cls: 'warn'}
                 : p <= 90 ? {label: 'תקין (AGA, 10-90)', cls: ''}
-                : p <= 97 ? {label: 'אחוזון 90-97 — LGA', cls: 'warn'}
-                : {label: 'מעל אחוזון 97 — מקרוזומיה', cls: 'warn'},
+                : p <= 97 ? {label: 'אחוזון 90-97, LGA', cls: 'warn'}
+                : {label: 'מעל אחוזון 97, מקרוזומיה', cls: 'warn'},
     table: {
       14: [70,77,93,109,116], 15: [88,97,117,137,146], 16: [110,121,146,171,183],
       17: [136,150,181,212,226], 18: [167,185,223,261,279], 19: [205,227,273,319,341],
@@ -596,7 +596,7 @@ const PCT_TABLES = {
     }
   },
   bpd: {
-    label: "BPD — קוטר דו-קודקודי", unit: 'מ״מ', source: "Hadlock 1991",
+    label: "BPD, קוטר דו-קודקודי", unit: 'מ״מ', source: "Hadlock 1991",
     classify: (p) => p < 10 ? {label: 'מתחת לאחוזון 10', cls: 'warn'}
                 : p > 90 ? {label: 'מעל אחוזון 90', cls: 'warn'}
                 : {label: 'בטווח התקין (10-90)', cls: ''},
@@ -613,12 +613,12 @@ const PCT_TABLES = {
     }
   },
   hc: {
-    label: "HC — היקף ראש", unit: 'מ״מ', source: "Chervenak",
-    classify: (p) => p < 3 ? {label: 'מתחת לאחוזון 3 — חשד למיקרוצפליה', cls: 'warn'}
+    label: "HC, היקף ראש", unit: 'מ״מ', source: "Chervenak",
+    classify: (p) => p < 3 ? {label: 'מתחת לאחוזון 3, חשד למיקרוצפליה', cls: 'warn'}
                 : p < 10 ? {label: 'אחוזון 3-10', cls: 'warn'}
                 : p <= 90 ? {label: 'בטווח התקין (10-90)', cls: ''}
                 : p <= 97 ? {label: 'אחוזון 90-97', cls: 'warn'}
-                : {label: 'מעל אחוזון 97 — חשד למקרוצפליה', cls: 'warn'},
+                : {label: 'מעל אחוזון 97, חשד למקרוצפליה', cls: 'warn'},
     table: {
       14: [93,97,103,109,113], 15: [105,110,117,124,129], 16: [117,122,130,138,143],
       17: [128,134,142,150,156], 18: [139,146,154,162,169], 19: [149,156,165,174,181],
@@ -632,7 +632,7 @@ const PCT_TABLES = {
     }
   },
   ac: {
-    label: "AC — היקף בטן", unit: 'מ״מ', source: "Hadlock 1984",
+    label: "AC, היקף בטן", unit: 'מ״מ', source: "Hadlock 1984",
     classify: (p) => p < 10 ? {label: 'מתחת לאחוזון 10', cls: 'warn'}
                 : p > 90 ? {label: 'מעל אחוזון 90', cls: 'warn'}
                 : {label: 'בטווח התקין (10-90)', cls: ''},
@@ -649,7 +649,7 @@ const PCT_TABLES = {
     }
   },
   fl: {
-    label: "FL — אורך עצם הירך", unit: 'מ״מ', source: "Hadlock 1984",
+    label: "FL, אורך עצם הירך", unit: 'מ״מ', source: "Hadlock 1984",
     classify: (p) => p < 10 ? {label: 'מתחת לאחוזון 10', cls: 'warn'}
                 : p > 90 ? {label: 'מעל אחוזון 90', cls: 'warn'}
                 : {label: 'בטווח התקין (10-90)', cls: ''},
@@ -668,7 +668,7 @@ const PCT_TABLES = {
 };
 
 function formatDateIL(date) {
-  if (!date || isNaN(date)) return '—';
+  if (!date || isNaN(date)) return '...';
   const d = String(date.getDate()).padStart(2, '0');
   const m = String(date.getMonth() + 1).padStart(2, '0');
   const y = date.getFullYear();
@@ -676,13 +676,13 @@ function formatDateIL(date) {
 }
 
 function daysBetween(d1, d2) {
-  return Math.floor((d2 - d1) / 86400000);
+  return Math.floor((d2, d1) / 86400000);
 }
 
 function todayISO() {
   const now = new Date();
   const offset = now.getTimezoneOffset();
-  return new Date(now.getTime() - offset * 60000).toISOString().split('T')[0];
+  return new Date(now.getTime(), offset * 60000).toISOString().split('T')[0];
 }
 
 function computeGAFromLMP(lmpStr, todayStr) {
@@ -704,9 +704,79 @@ function computeGAFromKnownGA(weeks, days, atDateStr, todayStr) {
   const atDate = new Date(atDateStr + 'T00:00:00');
   if (isNaN(atDate) || weeks == null || days == null) return null;
   const gaDays = weeks * 7 + days;
-  const lmp = new Date(atDate.getTime() - gaDays * 86400000);
+  const lmp = new Date(atDate.getTime(), gaDays * 86400000);
   const lmpStr = lmp.toISOString().split('T')[0];
   return computeGAFromLMP(lmpStr, todayStr);
+}
+
+/* ===== Chervenak HC mean and SDs by week (full table from נייר עמדה 31) =====
+   Each row: [-5SD, -4SD, -3SD, -2SD, -1SD, mean, +1SD, +2SD] in mm.
+   Source: Chervenak FA et al. 1984; Israeli Society OB/GYN Position Paper 31. */
+const CHERVENAK_HC = {
+  20: [101,116,131,145,160,175,189,204], 21: [113,128,143,157,172,187,201,216],
+  22: [125,140,154,169,184,198,213,228], 23: [136,151,166,180,195,210,224,239],
+  24: [147,162,177,191,206,221,235,250], 25: [158,173,188,202,217,232,246,261],
+  26: [169,183,198,213,227,242,257,271], 27: [179,194,208,223,238,252,267,282],
+  28: [189,203,218,233,247,262,277,291], 29: [198,213,227,242,257,271,286,301],
+  30: [207,222,236,251,266,281,295,310], 31: [216,230,245,260,274,289,304,318],
+  32: [224,239,253,268,283,297,312,327], 33: [232,246,261,276,290,305,320,334],
+  34: [239,253,268,283,297,312,327,341], 35: [245,260,275,289,304,319,333,348],
+  36: [251,266,281,295,310,325,339,354], 37: [257,272,286,301,316,330,345,360],
+  38: [262,276,291,306,320,335,350,364], 39: [266,281,295,310,325,339,354,369],
+  40: [270,284,299,314,328,343,358,372], 41: [272,287,302,316,331,346,360,375],
+  42: [275,289,304,319,333,348,363,377]
+};
+
+function computeChervenakZ(week, hc) {
+  const row = CHERVENAK_HC[week];
+  if (!row) return null;
+  const zVals = [-5,-4,-3,-2,-1,0,1,2];
+  const mean = row[5];
+  const sdEst = mean, row[4];
+  if (hc <= row[0]) {
+    const sd = row[1], row[0];
+    return { z: -5, (row[0], hc) / sd, mean, sd: sdEst };
+  }
+  if (hc >= row[7]) {
+    const sd = row[7], row[6];
+    return { z: 2 + (hc, row[7]) / sd, mean, sd: sdEst };
+  }
+  for (let i = 0; i < 7; i++) {
+    if (hc >= row[i] && hc <= row[i+1]) {
+      const frac = (hc, row[i]) / (row[i+1], row[i]);
+      return { z: zVals[i] + frac * (zVals[i+1], zVals[i]), mean, sd: sdEst };
+    }
+  }
+  return null;
+}
+
+function microcephalyClassify(z) {
+  if (z >= -2) {
+    return {
+      label: "בטווח התקין (לא מתחת ל-2SD)",
+      cls: "",
+      recommendation: "היקף הראש בטווח התקין לפי נייר עמדה 31. אין צורך בבירור ייעודי למיקרוצפליה. המשך מעקב הריון רגיל."
+    };
+  }
+  if (z > -3) {
+    return {
+      label: "חשד למיקרוצפליה (בין -2SD ל--3SD)",
+      cls: "warn",
+      recommendation: "מומלץ בירור לפי נייר עמדה 31 של האיגוד הישראלי לגינקולוגיה ומיילדות:\n1. אישור גיל הריון מדויק (חיוני; ייעוץ עלול להיות לא מדויק בהיעדר אישור).\n2. הערכה ביומטרית וביופיזיקאלית של העובר.\n3. בדיקת על-שמע מכוונת למבנה המוח: חתכים אקסיאליים (החריץ האינטר-המיספרי, CSP, חדרים לטרליים עם רוחב האטריום, חדר שלישי ותלמוס, מוחון, חדר רביעי, וורמיס וציסטרנה מאגנה), חתך מיד-סגיטאלי (קורפוס קלוסום ווורמיס), וחתך קורונלי (קרניים קדמיות, CSP).\n4. השלמת סקירת מערכות אם לא בוצעה.\n5. השוואה למגמת גדילת ראש בבדיקות קודמות.\n6. הפניה לייעוץ גנטי וסקר STORCH.\n7. מעקב סונוגרפי בפער שלא יקטן מ-3 שבועות.\n8. במקרה של ממצא חריג בבדיקה הסונוגרפית או בדיקה לא מספקת, הפניה ל-MRI מוח עוברי.\n\nנתון פרוגנוסטי (נייר עמדה 31): בכ-90% מהעוברים בטווח זה, היקף הראש לאחר הלידה תקין. סיכון לפיגור שכלי (IQ מתחת ל-70) הינו כ-10.5%."
+    };
+  }
+  if (z > -4) {
+    return {
+      label: "מיקרוצפליה (בין -3SD ל--4SD)",
+      cls: "warn",
+      recommendation: "אבחנת מיקרוצפליה לפי הגדרת נייר עמדה 31 (HC מתחת ל--3SD). בנוסף לבירור הסטנדרטי, מומלץ:\n1. MRI של מוח העובר.\n2. ייעוץ נוירולוג ילדים.\n3. ייעוץ גנטי מורחב + סקר STORCH.\n4. דיון מסכם במסגרת ייעוץ מקצועי רב-תחומי (גנטיקה, נוירולוגית עובר, נוירולוג ילדים, מרפאת הריון בסיכון).\n\nנתון פרוגנוסטי (נייר עמדה 31): סיכון לפיגור שכלי (IQ מתחת ל-70) הינו כ-51.2%."
+    };
+  }
+  return {
+    label: "מיקרוצפליה חמורה (מתחת ל--4SD)",
+    cls: "warn",
+    recommendation: "מיקרוצפליה חמורה. נדרש בירור מקיף לפי נייר עמדה 31:\n1. MRI של מוח העובר.\n2. ייעוץ נוירולוג ילדים דחוף.\n3. ייעוץ גנטי מורחב + סקר STORCH.\n4. דיון מסכם רב-תחומי לגבי המשך ההריון.\n\nנתון פרוגנוסטי (נייר עמדה 31): סיכון לפיגור שכלי קרוב ל-100%."
+  };
 }
 
 function getPercentileFor(measure, value, gaWeeks, gaDays) {
@@ -717,20 +787,20 @@ function getPercentileFor(measure, value, gaWeeks, gaDays) {
   const lower = Math.floor(gaDecimal);
   const upper = lower + 1;
   if (!tbl[lower]) return null;
-  const frac = gaDecimal - lower;
+  const frac = gaDecimal, lower;
   const upTbl = tbl[upper] || tbl[lower];
-  const interp = tbl[lower].map((v, i) => v + (upTbl[i] - v) * frac);
+  const interp = tbl[lower].map((v, i) => v + (upTbl[i], v) * frac);
   return interpolatePercentile(value, interp);
 }
 
 function interpolatePercentile(value, [p3, p10, p50, p90, p97]) {
   let p;
   if (value < p3) p = Math.max(0.5, 3 * (value / p3));
-  else if (value < p10) p = 3 + (10 - 3) * (value - p3) / (p10 - p3);
-  else if (value < p50) p = 10 + (50 - 10) * (value - p10) / (p50 - p10);
-  else if (value < p90) p = 50 + (90 - 50) * (value - p50) / (p90 - p50);
-  else if (value < p97) p = 90 + (97 - 90) * (value - p90) / (p97 - p90);
-  else p = Math.min(99.5, 97 + (value - p97) / Math.max(1, (p97 - p90)) * 3);
+  else if (value < p10) p = 3 + (10-3) * (value, p3) / (p10, p3);
+  else if (value < p50) p = 10 + (50-10) * (value, p10) / (p50, p10);
+  else if (value < p90) p = 50 + (90-50) * (value, p50) / (p90, p50);
+  else if (value < p97) p = 90 + (97-90) * (value, p90) / (p97, p90);
+  else p = Math.min(99.5, 97 + (value, p97) / Math.max(1, (p97, p90)) * 3);
   return { percentile: p, p3, p10, p50, p90, p97 };
 }
 
@@ -759,7 +829,7 @@ function renderCalculatorGA(content) {
         <div class="calc-field"><label>תאריך הבדיקה</label><input type="date" id="today2" value="${today}"></div>
         <button class="calc-btn" id="calc-ga-btn">חשב</button>
       </div>
-      <div class="calc-help">לדוגמה: סקירה ראשונה בתאריך X הראתה גיל הריון 12+3 — מה ה-EDD?</div>
+      <div class="calc-help">לדוגמה: סקירה ראשונה בתאריך X הראתה גיל הריון 12+3, מה ה-EDD?</div>
       <div id="ga-result-ga"></div>
     </div>
   `;
@@ -774,13 +844,13 @@ function renderCalculatorGA(content) {
     const eddStr = formatDateIL(r.edd);
     const w38a = formatDateIL(r.w38Start);
     const w38b = formatDateIL(r.w38End);
-    const summary = `גיל הריון ${r.weeks}+${r.days}, EDD ${eddStr}, שבוע 38 (37+0 - 37+6): ${w38a} - ${w38b} [לפי ${methodNote}].`;
+    const summary = `גיל הריון ${r.weeks}+${r.days}, EDD ${eddStr}, שבוע 38 (37+0-37+6): ${w38a}, ${w38b} [לפי ${methodNote}].`;
     el.innerHTML = `
       <div class="calc-result">
         <div class="result-line"><strong>LMP:</strong> ${lmpStr}</div>
         <div class="result-line"><strong>גיל הריון נוכחי:</strong> ${r.weeks} שבועות + ${r.days} ימים</div>
         <div class="result-line"><strong>EDD (תאריך משוער ללידה):</strong> ${eddStr}</div>
-        <div class="result-line"><strong>שבוע 38 (37+0 → 37+6):</strong> ${w38a} - ${w38b}</div>
+        <div class="result-line"><strong>שבוע 38 (37+0 → 37+6):</strong> ${w38a}, ${w38b}</div>
         <div class="result-line"><strong>${r.daysToEdd >= 0 ? 'ימים עד EDD' : 'ימים מעבר ל-EDD'}:</strong> ${Math.abs(r.daysToEdd)}</div>
         <button class="copy-summary-btn" data-text="${escapeHtml(summary)}">העתק לסיכום</button>
       </div>
@@ -815,7 +885,7 @@ function renderCalculatorFWP(content) {
   const fields = Object.entries(PCT_TABLES).map(([k, v]) => `
     <div class="calc-row" style="margin-bottom: 8px;">
       <div class="calc-field" style="flex: 2;">
-        <label>${v.label} <span style="color: var(--text-muted); font-weight: 400; font-size: 12px;">— ${v.source}</span></label>
+        <label>${v.label} <span style="color: var(--text-muted); font-weight: 400; font-size: 12px;">(${v.source})</span></label>
         <input type="number" id="us-v-${k}" min="0" step="0.1" placeholder="ערך ב${v.unit}">
       </div>
     </div>
@@ -832,10 +902,10 @@ function renderCalculatorFWP(content) {
         <button class="calc-btn" id="calc-us-btn" style="align-self: flex-end;">חשב</button>
       </div>
       <div style="border-top: 1px solid var(--border); margin: 14px 0 12px; padding-top: 12px;">
-        <div style="font-size: 13px; color: var(--text-muted); margin-bottom: 10px;">הזן ערכים רק במדדים שמעניינים אותך — השאר ריקים את השאר.</div>
+        <div style="font-size: 13px; color: var(--text-muted); margin-bottom: 10px;">הזן ערכים רק במדדים שמעניינים אותך, השאר ריקים את השאר.</div>
         ${fields}
       </div>
-      <div class="calc-help">טווח שבועות נתמך: 14-40. EFW, BPD, AC, FL לפי Hadlock; HC לפי Chervenak.</div>
+      <div class="calc-help">טווח שבועות נתמך: 14-40. EFW, BPD, AC, FL לפי Hadlock; HC לפי Chervenak. להערכת מיקרוצפליה עם סטיות תקן והמלצות, ראה: "הערכת מיקרוצפליה (HC + Chervenak)".</div>
       <div id="us-result"></div>
     </div>
   `;
@@ -870,13 +940,13 @@ function renderCalculatorFWP(content) {
       const p = pDisp(r.percentile);
       const cssMark = cls.cls === 'warn' ? '⚠️ ' : '';
       return `<div class="result-line">
-        <strong>${cfg.label}:</strong> ${v} ${cfg.unit} → אחוזון <strong>${p}</strong> · ${cssMark}${cls.label}
-        <span style="color: var(--text-muted); font-size: 13px;"> (טווח 10-90: ${round(r.p10, cfg.unit)}-${round(r.p90, cfg.unit)} ${cfg.unit})</span>
+        <strong>${cfg.label}:</strong> ${v} ${cfg.unit}, אחוזון <strong>${p}</strong> לפי ${cfg.source}. ${cssMark}${cls.label}.
+        <span style="color: var(--text-muted); font-size: 13px;"> (טווח 10 עד 90 בשבוע ${w}+${d}: ${round(r.p10, cfg.unit)} עד ${round(r.p90, cfg.unit)} ${cfg.unit})</span>
       </div>`;
     }).join('');
 
     const summaryLines = results.map(({ cfg, v, r }) =>
-      `${cfg.label}: ${v} ${cfg.unit} (אחוזון ${pDisp(r.percentile)})`
+      `${cfg.label}: ${v} ${cfg.unit} (אחוזון ${pDisp(r.percentile)} לפי ${cfg.source})`
     ).join('; ');
     const summary = `מדדי אולטרסאונד בשבוע ${w}+${d}: ${summaryLines}.`;
 
@@ -885,6 +955,59 @@ function renderCalculatorFWP(content) {
         <div class="result-line" style="margin-bottom: 10px;"><strong>גיל הריון:</strong> ${w}+${d}</div>
         ${resultLines}
         <button class="copy-summary-btn" data-text="${escapeHtml(summary)}">העתק סיכום לכל המדדים</button>
+      </div>
+    `;
+    attachCopySummary(out);
+  });
+}
+
+function renderCalculatorMicrocephaly(content) {
+  content.innerHTML = `
+    <h2>הערכת מיקרוצפליה (HC + Chervenak)</h2>
+    <div class="topic-meta">מחשבונים וכלים, לפי נייר עמדה 31</div>
+
+    <div class="calc-card">
+      <h3>חישוב סטיות תקן והמלצות לפי נייר עמדה 31</h3>
+      <div class="calc-row">
+        <div class="calc-field"><label>שבועות מלאים</label><input type="number" id="ch-w" min="20" max="42" step="1" placeholder="32"></div>
+        <div class="calc-field"><label>HC במ״מ</label><input type="number" id="ch-hc" min="50" max="500" step="0.5" placeholder="295"></div>
+        <button class="calc-btn" id="calc-ch-btn">חשב</button>
+      </div>
+      <div class="calc-help">השתמש בטבלת Chervenak (האיגוד הישראלי לגינקולוגיה ומיילדות, נייר עמדה 31, 2015). שבועות מלאים בלבד (20 בטבלה מייצג 20+0 עד 20+6).</div>
+      <div id="ch-result"></div>
+    </div>
+  `;
+
+  document.getElementById('calc-ch-btn').addEventListener('click', () => {
+    const w = parseInt(document.getElementById('ch-w').value);
+    const hc = parseFloat(document.getElementById('ch-hc').value);
+    const out = document.getElementById('ch-result');
+    if (!w || w < 20 || w > 42 || isNaN(hc) || hc <= 0) {
+      out.innerHTML = '<div class="calc-result warn">יש להזין שבועות (20-42) ו-HC במ״מ.</div>';
+      return;
+    }
+    const r = computeChervenakZ(w, hc);
+    if (!r) {
+      out.innerHTML = '<div class="calc-result warn">טווח שבועות מחוץ לטבלה.</div>';
+      return;
+    }
+    const cls = microcephalyClassify(r.z);
+    const zStr = r.z.toFixed(2);
+    const zSigned = r.z >= 0 ? '+' + zStr : zStr;
+    const recLines = cls.recommendation.split('\n').map(line =>
+      `<div class="result-line">${escapeHtml(line)}</div>`
+    ).join('');
+    const summary = `HC עוברי בשבוע ${w}: ${hc} מ״מ. ממוצע לשבוע זה ${r.mean} מ״מ (SD ${r.sd} מ״מ). מספר סטיות תקן מהממוצע: ${zSigned}. סיווג: ${cls.label}. מקור: Chervenak, נייר עמדה 31.`;
+    out.innerHTML = `
+      <div class="calc-result ${cls.cls}">
+        <div class="result-line"><strong>גיל הריון:</strong> ${w} שבועות מלאים</div>
+        <div class="result-line"><strong>ממוצע HC לשבוע ${w}:</strong> ${r.mean} מ״מ (SD ${r.sd} מ״מ)</div>
+        <div class="result-line"><strong>HC הנוכחי:</strong> ${hc} מ״מ</div>
+        <div class="result-line"><strong>מספר סטיות תקן מהממוצע:</strong> ${zSigned} SD</div>
+        <div class="result-line"><strong>סיווג:</strong> ${cls.label}</div>
+        <div class="result-line" style="margin-top: 10px;"><strong>המלצות:</strong></div>
+        ${recLines}
+        <button class="copy-summary-btn" data-text="${escapeHtml(summary)}">העתק סיכום</button>
       </div>
     `;
     attachCopySummary(out);
@@ -1031,6 +1154,7 @@ function initApp() {
     if (topic.type === 'calculator') {
       if (topic.calc === 'ga') renderCalculatorGA(content);
       else if (topic.calc === 'fwp') renderCalculatorFWP(content);
+      else if (topic.calc === 'microcephaly') renderCalculatorMicrocephaly(content);
       if (window.innerWidth <= 768) {
         sidebar.classList.remove('open');
         overlay.classList.remove('show');
