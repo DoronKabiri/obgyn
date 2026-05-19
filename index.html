@@ -489,7 +489,7 @@
   </main>
 </div>
 
-<script src="topics.enc.js?v=11"></script>
+<script src="topics.enc.js?v=14"></script>
 <script>
 /* ===== Login & decryption ===== */
 async function decryptTopics(encryptedB64, password, iterations) {
@@ -520,12 +520,66 @@ function runAppCode(code) {
   document.head.appendChild(s);
 }
 
+const MAX_ATTEMPTS = 3;
+const LOCKOUT_MINUTES = 15;
+
+function getLockoutState() {
+  try {
+    const s = JSON.parse(localStorage.getItem('obgyn-lockout') || '{}');
+    return { failures: s.failures || 0, lockedUntil: s.lockedUntil || 0 };
+  } catch { return { failures: 0, lockedUntil: 0 }; }
+}
+function setLockoutState(s) {
+  localStorage.setItem('obgyn-lockout', JSON.stringify(s));
+}
+function isLocked() {
+  return getLockoutState().lockedUntil > Date.now();
+}
+function recordFailure() {
+  const s = getLockoutState();
+  s.failures++;
+  if (s.failures >= MAX_ATTEMPTS) {
+    s.lockedUntil = Date.now() + LOCKOUT_MINUTES * 60 * 1000;
+    s.failures = 0;
+  }
+  setLockoutState(s);
+}
+function resetFailures() {
+  localStorage.removeItem('obgyn-lockout');
+}
+function formatRemaining(sec) {
+  const m = Math.floor(sec / 60);
+  const s = sec % 60;
+  return `${m}:${String(s).padStart(2, '0')}`;
+}
+
 (function loginInit() {
   const form = document.getElementById('login-form');
   const pwField = document.getElementById('login-password');
   const btn = document.getElementById('login-btn');
   const errEl = document.getElementById('login-error');
   const overlay = document.getElementById('login-overlay');
+
+  let lockoutTimer = null;
+  function refreshLockoutUI() {
+    const s = getLockoutState();
+    if (s.lockedUntil > Date.now()) {
+      const remaining = Math.ceil((s.lockedUntil - Date.now()) / 1000);
+      btn.disabled = true;
+      pwField.disabled = true;
+      errEl.textContent = `כניסה ננעלה לאחר ניסיונות שגויים. נסה שוב בעוד ${formatRemaining(remaining)}.`;
+      if (!lockoutTimer) lockoutTimer = setInterval(refreshLockoutUI, 1000);
+    } else {
+      btn.disabled = false;
+      pwField.disabled = false;
+      if (lockoutTimer) {
+        clearInterval(lockoutTimer);
+        lockoutTimer = null;
+        errEl.textContent = '';
+      }
+    }
+  }
+  refreshLockoutUI();
 
   // Try auto-login from sessionStorage
   const saved = sessionStorage.getItem('obgyn-decrypted');
@@ -542,6 +596,7 @@ function runAppCode(code) {
 
   form.addEventListener('submit', async (e) => {
     e.preventDefault();
+    if (isLocked()) { refreshLockoutUI(); return; }
     const pw = pwField.value;
     if (!pw) return;
     btn.disabled = true;
@@ -550,14 +605,22 @@ function runAppCode(code) {
     try {
       const code = await decryptTopics(window.ENCRYPTED_TOPICS, pw, window.PBKDF2_ITERATIONS || 250000);
       runAppCode(code);
+      resetFailures();
       sessionStorage.setItem('obgyn-decrypted', code);
       overlay.classList.add('hidden');
       initApp();
     } catch (err) {
-      errEl.textContent = 'סיסמה שגויה. נסה שוב.';
-      btn.disabled = false;
+      recordFailure();
+      const s = getLockoutState();
       btn.textContent = 'כניסה';
-      pwField.select();
+      btn.disabled = false;
+      if (s.lockedUntil > Date.now()) {
+        refreshLockoutUI();
+      } else {
+        const remaining = MAX_ATTEMPTS - s.failures;
+        errEl.textContent = `סיסמה שגויה. נותרו ${remaining} ניסיונות עד נעילה.`;
+        pwField.select();
+      }
     }
   });
 
@@ -676,13 +739,13 @@ function formatDateIL(date) {
 }
 
 function daysBetween(d1, d2) {
-  return Math.floor((d2, d1) / 86400000);
+  return Math.floor((d2 - d1) / 86400000);
 }
 
 function todayISO() {
   const now = new Date();
   const offset = now.getTimezoneOffset();
-  return new Date(now.getTime(), offset * 60000).toISOString().split('T')[0];
+  return new Date(now.getTime() - offset * 60000).toISOString().split('T')[0];
 }
 
 function computeGAFromLMP(lmpStr, todayStr) {
@@ -704,7 +767,7 @@ function computeGAFromKnownGA(weeks, days, atDateStr, todayStr) {
   const atDate = new Date(atDateStr + 'T00:00:00');
   if (isNaN(atDate) || weeks == null || days == null) return null;
   const gaDays = weeks * 7 + days;
-  const lmp = new Date(atDate.getTime(), gaDays * 86400000);
+  const lmp = new Date(atDate.getTime() - gaDays * 86400000);
   const lmpStr = lmp.toISOString().split('T')[0];
   return computeGAFromLMP(lmpStr, todayStr);
 }
@@ -732,19 +795,19 @@ function computeChervenakZ(week, hc) {
   if (!row) return null;
   const zVals = [-5,-4,-3,-2,-1,0,1,2];
   const mean = row[5];
-  const sdEst = mean, row[4];
+  const sdEst = mean - row[4];
   if (hc <= row[0]) {
-    const sd = row[1], row[0];
-    return { z: -5, (row[0], hc) / sd, mean, sd: sdEst };
+    const sd = row[1] - row[0];
+    return { z: -5 - (row[0] - hc) / sd, mean, sd: sdEst };
   }
   if (hc >= row[7]) {
-    const sd = row[7], row[6];
-    return { z: 2 + (hc, row[7]) / sd, mean, sd: sdEst };
+    const sd = row[7] - row[6];
+    return { z: 2 + (hc - row[7]) / sd, mean, sd: sdEst };
   }
   for (let i = 0; i < 7; i++) {
     if (hc >= row[i] && hc <= row[i+1]) {
-      const frac = (hc, row[i]) / (row[i+1], row[i]);
-      return { z: zVals[i] + frac * (zVals[i+1], zVals[i]), mean, sd: sdEst };
+      const frac = (hc - row[i]) / (row[i+1] - row[i]);
+      return { z: zVals[i] + frac * (zVals[i+1] - zVals[i]), mean, sd: sdEst };
     }
   }
   return null;
@@ -787,20 +850,20 @@ function getPercentileFor(measure, value, gaWeeks, gaDays) {
   const lower = Math.floor(gaDecimal);
   const upper = lower + 1;
   if (!tbl[lower]) return null;
-  const frac = gaDecimal, lower;
+  const frac = gaDecimal - lower;
   const upTbl = tbl[upper] || tbl[lower];
-  const interp = tbl[lower].map((v, i) => v + (upTbl[i], v) * frac);
+  const interp = tbl[lower].map((v, i) => v + (upTbl[i] - v) * frac);
   return interpolatePercentile(value, interp);
 }
 
 function interpolatePercentile(value, [p3, p10, p50, p90, p97]) {
   let p;
   if (value < p3) p = Math.max(0.5, 3 * (value / p3));
-  else if (value < p10) p = 3 + (10-3) * (value, p3) / (p10, p3);
-  else if (value < p50) p = 10 + (50-10) * (value, p10) / (p50, p10);
-  else if (value < p90) p = 50 + (90-50) * (value, p50) / (p90, p50);
-  else if (value < p97) p = 90 + (97-90) * (value, p90) / (p97, p90);
-  else p = Math.min(99.5, 97 + (value, p97) / Math.max(1, (p97, p90)) * 3);
+  else if (value < p10) p = 3 + (10 - 3) * (value - p3) / (p10 - p3);
+  else if (value < p50) p = 10 + (50 - 10) * (value - p10) / (p50 - p10);
+  else if (value < p90) p = 50 + (90 - 50) * (value - p50) / (p90 - p50);
+  else if (value < p97) p = 90 + (97 - 90) * (value - p90) / (p97 - p90);
+  else p = Math.min(99.5, 97 + (value - p97) / Math.max(1, (p97 - p90)) * 3);
   return { percentile: p, p3, p10, p50, p90, p97 };
 }
 
@@ -1001,9 +1064,9 @@ function renderCalculatorMicrocephaly(content) {
     out.innerHTML = `
       <div class="calc-result ${cls.cls}">
         <div class="result-line"><strong>גיל הריון:</strong> ${w} שבועות מלאים</div>
-        <div class="result-line"><strong>ממוצע HC לשבוע ${w}:</strong> ${r.mean} מ״מ (SD ${r.sd} מ״מ)</div>
+        <div class="result-line"><strong>ממוצע HC לשבוע ${w}:</strong> ${r.mean} מ״מ (SD ${r.sd})</div>
         <div class="result-line"><strong>HC הנוכחי:</strong> ${hc} מ״מ</div>
-        <div class="result-line"><strong>מספר סטיות תקן מהממוצע:</strong> ${zSigned} SD</div>
+        <div class="result-line"><strong>מספר סטיות תקן מהממוצע:</strong> ${zSigned} SD לפי עקומות Chervenak</div>
         <div class="result-line"><strong>סיווג:</strong> ${cls.label}</div>
         <div class="result-line" style="margin-top: 10px;"><strong>המלצות:</strong></div>
         ${recLines}
