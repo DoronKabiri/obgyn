@@ -24,6 +24,21 @@
     --warn-bg: #fff7ed;
     --warn-border: #fed7aa;
   }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --primary: #60a5fa;
+      --primary-light: #93c5fd;
+      --bg: #0f172a;
+      --card-bg: #1e293b;
+      --text: #e2e8f0;
+      --text-muted: #94a3b8;
+      --border: #334155;
+      --hover: #1e3a52;
+      --success: #4ade80;
+      --warn-bg: #422006;
+      --warn-border: #92400e;
+    }
+  }
   * { box-sizing: border-box; }
   html, body { margin: 0; padding: 0; }
   body {
@@ -113,6 +128,79 @@
     transition: background 0.1s, border-color 0.1s;
   }
   aside li a:hover { background: var(--hover); }
+  aside li a .topic-cb {
+    margin-inline-end: 8px;
+    cursor: pointer;
+    accent-color: var(--primary);
+    transform: scale(1.1);
+    vertical-align: middle;
+  }
+  /* Floating compose bar */
+  #compose-bar {
+    position: fixed;
+    bottom: 24px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: var(--primary);
+    color: white;
+    padding: 12px 24px;
+    border-radius: 999px;
+    box-shadow: 0 6px 20px rgba(0,0,0,0.2);
+    display: none;
+    gap: 12px;
+    align-items: center;
+    z-index: 50;
+    font-weight: 500;
+  }
+  #compose-bar.show { display: flex; }
+  #compose-bar .count {
+    background: white;
+    color: var(--primary);
+    border-radius: 999px;
+    padding: 2px 10px;
+    font-weight: 700;
+    font-size: 13px;
+    min-width: 26px;
+    text-align: center;
+  }
+  #compose-bar button {
+    background: white;
+    color: var(--primary);
+    border: none;
+    padding: 7px 16px;
+    border-radius: 999px;
+    cursor: pointer;
+    font-family: inherit;
+    font-weight: 600;
+    font-size: 14px;
+  }
+  #compose-bar .btn-clear {
+    background: transparent;
+    color: white;
+    border: 1px solid rgba(255,255,255,0.4);
+    font-weight: 500;
+  }
+  #compose-bar button:hover { opacity: 0.92; }
+  #compose-view .compose-actions {
+    display: flex;
+    gap: 10px;
+    margin-bottom: 18px;
+    flex-wrap: wrap;
+  }
+  #compose-view .compose-letter {
+    background: var(--card-bg);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 24px 28px;
+    font-size: 16px;
+    line-height: 1.8;
+    white-space: pre-wrap;
+  }
+  #compose-view .compose-meta {
+    color: var(--text-muted);
+    font-size: 14px;
+    margin-bottom: 14px;
+  }
   aside li a.active {
     background: var(--hover);
     border-inline-end-color: var(--primary);
@@ -209,21 +297,27 @@
     justify-content: flex-start;
     gap: 8px;
     margin-bottom: 18px;
+    position: sticky;
+    top: 60px;
+    background: var(--bg);
+    padding: 8px 0;
+    z-index: 5;
   }
   .copy-all-btn {
-    background: white;
-    color: var(--primary);
+    background: var(--primary);
+    color: white;
     border: 1.5px solid var(--primary);
-    padding: 8px 16px;
+    padding: 10px 20px;
     border-radius: 6px;
-    font-size: 14px;
-    font-weight: 500;
+    font-size: 14.5px;
+    font-weight: 600;
     cursor: pointer;
     font-family: inherit;
     transition: all 0.15s;
+    box-shadow: 0 2px 6px rgba(31, 78, 121, 0.2);
   }
-  .copy-all-btn:hover { background: var(--primary); color: white; }
-  .copy-all-btn.copied { background: var(--success); color: white; border-color: var(--success); }
+  .copy-all-btn:hover { background: var(--primary-light); border-color: var(--primary-light); }
+  .copy-all-btn.copied { background: var(--success); border-color: var(--success); }
   .copy-all-btn.copied::before { content: "✓ "; }
 
   .welcome {
@@ -485,11 +579,19 @@
     <div class="welcome">
       <h2>בחר נושא מהתפריט</h2>
       <p>או חפש בתיבה למעלה</p>
+      <p style="margin-top:20px;font-size:14px;color:var(--text-muted);">💡 טיפ: סמן כמה נושאים בתיבות הסימון בסיידבר כדי להרכיב מכתב מאוחד</p>
     </div>
   </main>
 </div>
 
-<script src="topics.enc.js?v=15"></script>
+<div id="compose-bar">
+  <span class="count" id="compose-count">0</span>
+  <span>נושאים נבחרים</span>
+  <button class="btn-compose">📝 הרכב מכתב</button>
+  <button class="btn-clear">נקה</button>
+</div>
+
+<script src="topics.enc.js?v=18"></script>
 <script>
 /* ===== Login & decryption ===== */
 async function decryptTopics(encryptedB64, password, iterations) {
@@ -1024,6 +1126,148 @@ function renderCalculatorFWP(content) {
   });
 }
 
+function renderCalculatorBishop(content) {
+  content.innerHTML = `
+    <h2>מחשבון Bishop Score</h2>
+    <div class="topic-meta">מחשבונים וכלים. ציון להערכת בשלות צוואר לזירוז.</div>
+    <div class="calc-card">
+      <h3>הזן ממצאי בדיקה צווארית</h3>
+      <div class="calc-row">
+        <div class="calc-field"><label>פתיחה (ס״מ)</label>
+          <select id="b-dil">
+            <option value="0">0 (סגור)</option>
+            <option value="1">1-2</option>
+            <option value="2">3-4</option>
+            <option value="3">5 ומעלה</option>
+          </select></div>
+        <div class="calc-field"><label>מחיקה (%)</label>
+          <select id="b-eff">
+            <option value="0">0-30%</option>
+            <option value="1">40-50%</option>
+            <option value="2">60-70%</option>
+            <option value="3">80% ומעלה</option>
+          </select></div>
+        <div class="calc-field"><label>גובה הראש (Station)</label>
+          <select id="b-sta">
+            <option value="0">-3</option>
+            <option value="1">-2</option>
+            <option value="2">-1 / 0</option>
+            <option value="3">+1 / +2</option>
+          </select></div>
+        <div class="calc-field"><label>גמישות הצוואר</label>
+          <select id="b-con">
+            <option value="0">קשה (Firm)</option>
+            <option value="1">בינוני (Medium)</option>
+            <option value="2">רך (Soft)</option>
+          </select></div>
+        <div class="calc-field"><label>מיקום הצוואר</label>
+          <select id="b-pos">
+            <option value="0">אחורי (Posterior)</option>
+            <option value="1">אמצעי (Mid)</option>
+            <option value="2">קדמי (Anterior)</option>
+          </select></div>
+      </div>
+      <button class="calc-btn" id="calc-b-btn">חשב Bishop</button>
+      <div class="calc-help">טווח 0-13. ≥8 בשל, 7 גבולי, ≤6 לא בשל ודורש הבשלה צווארית.</div>
+      <div id="b-result"></div>
+    </div>
+  `;
+  document.getElementById('calc-b-btn').addEventListener('click', () => {
+    const dil = +document.getElementById('b-dil').value;
+    const eff = +document.getElementById('b-eff').value;
+    const sta = +document.getElementById('b-sta').value;
+    const con = +document.getElementById('b-con').value;
+    const pos = +document.getElementById('b-pos').value;
+    const score = dil + eff + sta + con + pos;
+    let cls = '', label = '', plan = '';
+    if (score >= 8) { cls = 'good'; label = 'צוואר בשל (Favorable)'; plan = 'ניתן לזירוז ישיר עם אוקסיטוצין +/- ARM.'; }
+    else if (score >= 7) { label = 'גבולי'; plan = 'זירוז ישיר אפשרי, או הבשלה צווארית קלה.'; }
+    else { cls = 'warn'; label = 'לא בשל (Unfavorable)'; plan = 'הבשלה צווארית טרם זירוז: בלון, PGE2 (Propess) או PGE1 (Misoprostol, off-label). שילובים אפשריים.'; }
+    const summary = `Bishop Score: ${score}/13 (פתיחה ${dil}, מחיקה ${eff}, station ${sta}, גמישות ${con}, מיקום ${pos}). ${label}.`;
+    document.getElementById('b-result').innerHTML = `<div class="calc-result ${cls}"><div class="result-line"><strong>Bishop Score:</strong> ${score}/13</div><div class="result-line"><strong>סיווג:</strong> ${label}</div><div class="result-line" style="margin-top: 8px;"><strong>גישה מומלצת:</strong></div><div class="result-line">${plan}</div><button class="copy-summary-btn" data-text="${escapeHtml(summary)}">העתק לסיכום</button></div>`;
+    attachCopySummary(document.getElementById('b-result'));
+  });
+}
+
+function renderCalculatorClexane(content) {
+  content.innerHTML = `
+    <h2>מחשבון מינון Clexane (Enoxaparin)</h2>
+    <div class="topic-meta">מחשבונים וכלים. מינון לפי משקל ואינדיקציה.</div>
+    <div class="calc-card">
+      <div class="calc-row">
+        <div class="calc-field"><label>משקל (ק״ג)</label><input type="number" id="cx-w" min="30" max="200" step="0.5" placeholder="70"></div>
+        <div class="calc-field"><label>אינדיקציה</label>
+          <select id="cx-ind">
+            <option value="prophy">מנע סטנדרטי</option>
+            <option value="interm">ביניים</option>
+            <option value="thera">טיפולי</option>
+          </select></div>
+        <button class="calc-btn" id="calc-cx-btn">חשב</button>
+      </div>
+      <div class="calc-help">מנע 40 מ״ג ליום (1 מ״ג/ק״ג ב-BMI גבוה); טיפולי 1 מ״ג/ק״ג כל 12 שעות. בהריון נדרשת לעיתים הגדלה של ~1.5x ומעקב Anti-Xa ב-BMI קיצוני / GFR נמוך.</div>
+      <div id="cx-result"></div>
+    </div>
+  `;
+  document.getElementById('calc-cx-btn').addEventListener('click', () => {
+    const w = parseFloat(document.getElementById('cx-w').value);
+    const ind = document.getElementById('cx-ind').value;
+    const out = document.getElementById('cx-result');
+    if (!w || w < 30 || w > 200) { out.innerHTML = '<div class="calc-result warn">משקל לא תקין (30-200 ק״ג).</div>'; return; }
+    let dose = '', schedule = '', note = '';
+    if (ind === 'prophy') {
+      if (w < 50) { dose = '20 מ״ג'; schedule = 'פעם ביום'; }
+      else if (w <= 90) { dose = '40 מ״ג'; schedule = 'פעם ביום'; }
+      else if (w <= 130) { dose = '60 מ״ג'; schedule = 'פעם ביום'; note = 'או 40 מ״ג x2 ביום'; }
+      else { dose = `${Math.round(w*0.5)} מ״ג`; schedule = 'פעם ביום (0.5 מ״ג/ק״ג)'; note = 'BMI גבוה, שיקול Anti-Xa'; }
+    } else if (ind === 'interm') {
+      dose = `${Math.round(w*0.75)} מ״ג`; schedule = 'פעם ביום (0.75 מ״ג/ק״ג)';
+      note = 'מינון ביניים, סיכון בינוני (לדוגמה APS עם תחלואה הריונית, היסטוריה של VTE)';
+    } else {
+      dose = `${Math.round(w*1.0)} מ״ג`; schedule = 'כל 12 שעות (1 מ״ג/ק״ג x2 ביום)';
+      note = 'מינון טיפולי. בהריון לעיתים נדרשת הגדלה של 1.5x. מעקב Anti-Xa: יעד 0.6-1.0 IU/mL ב-Peak (4 שעות לאחר מנה).';
+    }
+    const summary = `Clexane: ${dose} ${schedule}. ${note ? '(' + note + ')' : ''}`;
+    out.innerHTML = `<div class="calc-result"><div class="result-line"><strong>מינון:</strong> ${dose}, ${schedule}</div>${note ? `<div class="result-line" style="color: var(--text-muted);">${note}</div>` : ''}<button class="copy-summary-btn" data-text="${escapeHtml(summary)}">העתק לסיכום</button></div>`;
+    attachCopySummary(out);
+  });
+}
+
+function renderCalculatorBMI(content) {
+  content.innerHTML = `
+    <h2>מחשבון BMI + עלייה במשקל בהריון (IOM)</h2>
+    <div class="topic-meta">מחשבונים וכלים. המלצות לפי Institute of Medicine.</div>
+    <div class="calc-card">
+      <div class="calc-row">
+        <div class="calc-field"><label>גובה (ס״מ)</label><input type="number" id="bmi-h" min="130" max="220" step="0.5" placeholder="165"></div>
+        <div class="calc-field"><label>משקל לפני הריון (ק״ג)</label><input type="number" id="bmi-w" min="30" max="200" step="0.5" placeholder="65"></div>
+        <div class="calc-field"><label>הריון</label>
+          <select id="bmi-twin">
+            <option value="single">יחיד</option>
+            <option value="twin">תאומים</option>
+          </select></div>
+        <button class="calc-btn" id="calc-bmi-btn">חשב</button>
+      </div>
+      <div id="bmi-result"></div>
+    </div>
+  `;
+  document.getElementById('calc-bmi-btn').addEventListener('click', () => {
+    const h = parseFloat(document.getElementById('bmi-h').value);
+    const w = parseFloat(document.getElementById('bmi-w').value);
+    const twin = document.getElementById('bmi-twin').value === 'twin';
+    const out = document.getElementById('bmi-result');
+    if (!h || !w) { out.innerHTML = '<div class="calc-result warn">יש להזין גובה ומשקל.</div>'; return; }
+    const bmi = w / Math.pow(h/100, 2);
+    let cat = '', range = '', cls = '';
+    if (bmi < 18.5) { cat = 'תת-משקל'; range = twin ? 'מידע מוגבל בתאומים' : '12.5-18 ק״ג'; cls = 'warn'; }
+    else if (bmi < 25) { cat = 'תקין'; range = twin ? '17-25 ק״ג' : '11.5-16 ק״ג'; }
+    else if (bmi < 30) { cat = 'עודף משקל'; range = twin ? '14-23 ק״ג' : '7-11.5 ק״ג'; cls = 'warn'; }
+    else { cat = 'השמנה'; range = twin ? '11-19 ק״ג' : '5-9 ק״ג'; cls = 'warn'; }
+    const summary = `BMI ${bmi.toFixed(1)} (${cat}). המלצת עלייה במשקל: ${range}.`;
+    out.innerHTML = `<div class="calc-result ${cls}"><div class="result-line"><strong>BMI:</strong> ${bmi.toFixed(1)} kg/m²</div><div class="result-line"><strong>קטגוריה:</strong> ${cat}</div><div class="result-line"><strong>עלייה במשקל מומלצת:</strong> ${range}</div><button class="copy-summary-btn" data-text="${escapeHtml(summary)}">העתק לסיכום</button></div>`;
+    attachCopySummary(out);
+  });
+}
+
 function renderCalculatorMicrocephaly(content) {
   content.innerHTML = `
     <h2>הערכת מיקרוצפליה (HC + Chervenak)</h2>
@@ -1103,6 +1347,144 @@ function initApp() {
     return s.replace(/[^֐-׿a-zA-Z0-9]+/g, '-').replace(/^-|-$/g, '').toLowerCase();
   }
 
+  // MRU (Most Recently Used) topics
+  const MRU_KEY = 'obgyn-mru';
+  function getMRU() {
+    try { return JSON.parse(localStorage.getItem(MRU_KEY) || '[]'); } catch { return []; }
+  }
+  function pushMRU(id) {
+    if (!id) return;
+    const cur = getMRU().filter(x => x !== id);
+    cur.unshift(id);
+    localStorage.setItem(MRU_KEY, JSON.stringify(cur.slice(0, 6)));
+  }
+
+  // Selection state for compose
+  const SEL_KEY = 'obgyn-compose-sel';
+  let selected = new Set();
+  try { selected = new Set(JSON.parse(sessionStorage.getItem(SEL_KEY) || '[]')); } catch {}
+  function persistSelection() {
+    sessionStorage.setItem(SEL_KEY, JSON.stringify([...selected]));
+    updateComposeBar();
+  }
+  function updateComposeBar() {
+    const bar = document.getElementById('compose-bar');
+    const count = document.getElementById('compose-count');
+    if (selected.size > 0) {
+      bar.classList.add('show');
+      count.textContent = String(selected.size);
+    } else {
+      bar.classList.remove('show');
+    }
+  }
+  function toggleSelection(id, checked) {
+    if (checked) selected.add(id); else selected.delete(id);
+    persistSelection();
+  }
+
+  // Compose: merge selected topics into one letter
+  function composeLetter() {
+    if (selected.size === 0) return '';
+    const ordered = TOPICS.filter(t => selected.has(t.id) && t.type !== 'calculator');
+    if (ordered.length === 0) return '';
+    const parts = [];
+    let recCounter = 0;
+    const allWarnings = new Map(); // dedupe by text
+    let warningsIntro = null;
+    let firstDiscussion = true;
+    let hasTemplate = false;
+
+    ordered.forEach(t => {
+      // Template topics: include verbatim
+      if (t.template) {
+        parts.push(t.template);
+        hasTemplate = true;
+        return;
+      }
+      // Discussion
+      if (t.discussion) {
+        let d = t.discussion;
+        if (!firstDiscussion) {
+          d = d.replace(/^שוחחנו על המשמעות של /, 'בנוסף, שוחחנו על ');
+          d = d.replace(/^שוחחנו על /, 'בנוסף, שוחחנו על ');
+        }
+        firstDiscussion = false;
+        parts.push(d);
+      }
+      // Recommendations - renumber across topics
+      if (t.recommendations) {
+        let r = t.recommendations;
+        // Find numbered lines like "1. ..." and renumber
+        const lines = r.split('\n');
+        const renumbered = lines.map(line => {
+          const m = line.match(/^(\s*)(\d+)\.\s+(.*)$/);
+          if (m) {
+            recCounter++;
+            return `${m[1]}${recCounter}. ${m[3]}`;
+          }
+          return line;
+        });
+        parts.push(renumbered.join('\n'));
+      }
+      // Collect warnings (dedup)
+      if (!t.is_us_finding && t.warnings_items && t.warnings_items.length) {
+        if (!warningsIntro) warningsIntro = t.warnings_intro;
+        t.warnings_items.forEach(w => allWarnings.set(w.trim(), true));
+      }
+    });
+
+    // General recommendations - ONCE
+    const g = window.GENERAL_RECS || {};
+    if (g.intro || (g.items || []).length) {
+      const intro = g.intro || '';
+      const items = (g.items || []).map((x, i) => (i + 1) + '. ' + x).join('\n');
+      parts.push(intro + (items ? '\n' + items : ''));
+    }
+
+    // Warnings (deduped) - ONCE
+    if (allWarnings.size > 0) {
+      const wi = [...allWarnings.keys()].map(x => '• ' + x).join('\n');
+      parts.push((warningsIntro || 'יש להגיע מיידית לחדר לידה במקרה של:') + '\n' + wi);
+    }
+
+    // Signature (postpartum if any topic is postpartum)
+    const isPostpartum = ordered.some(t => t.type === 'postpartum');
+    const sig = isPostpartum ? (window.SIGNATURE_POSTPARTUM || window.SIGNATURE) : window.SIGNATURE;
+    if (sig) parts.push(sig);
+
+    return parts.join('\n\n');
+  }
+
+  function showComposeView() {
+    const text = composeLetter();
+    if (!text) {
+      content.innerHTML = '<div class="welcome"><h2>לא נבחרו נושאים</h2><p>סמן נושאים בתיבות הסימון בסיידבר</p></div>';
+      return;
+    }
+    const count = [...selected].filter(id => {
+      const t = TOPICS.find(x => x.id === id);
+      return t && t.type !== 'calculator';
+    }).length;
+    content.innerHTML = `
+      <div id="compose-view">
+        <h2>מכתב סיכום מורכב</h2>
+        <div class="compose-meta">מאוחד מ-${count} נושאים. אזהרות מאוחדות, המלצות ממוספרות 1-${0 /* will be computed */}, חתימה אחת.</div>
+        <div class="compose-actions">
+          <button class="copy-all-btn" id="compose-copy-btn">📋 העתק מכתב מלא</button>
+          <button class="copy-all-btn" id="compose-print-btn" style="background: var(--text-muted);">🖨️ הדפסה</button>
+          <button class="copy-all-btn" id="compose-back-btn" style="background: transparent; color: var(--primary);">← חזור לעריכה</button>
+        </div>
+        <div class="compose-letter" id="compose-letter-text">${escapeHtml(text)}</div>
+      </div>
+    `;
+    document.getElementById('compose-copy-btn').addEventListener('click', (e) => copyText(text, e.currentTarget));
+    document.getElementById('compose-print-btn').addEventListener('click', () => window.print());
+    document.getElementById('compose-back-btn').addEventListener('click', () => {
+      location.hash = '';
+      renderTopic('');
+    });
+  }
+
   function renderList(filter) {
     list.innerHTML = '';
     const q = (filter || '').trim().toLowerCase();
@@ -1117,6 +1499,29 @@ function initApp() {
       list.innerHTML = '<li class="no-results">אין תוצאות</li>';
       return;
     }
+
+    // MRU section at top when not filtering
+    if (!q) {
+      const mru = getMRU().filter(id => TOPICS.find(t => t.id === id));
+      if (mru.length > 0) {
+        const lab = document.createElement('li');
+        lab.className = 'group-label';
+        lab.textContent = '🕘 נצפו לאחרונה';
+        list.appendChild(lab);
+        mru.forEach(id => {
+          const t = TOPICS.find(x => x.id === id);
+          if (!t) return;
+          const li = document.createElement('li');
+          const a = document.createElement('a');
+          a.href = '#' + t.id;
+          a.textContent = t.title;
+          a.dataset.id = t.id;
+          li.appendChild(a);
+          list.appendChild(li);
+        });
+      }
+    }
+
     let lastGroup = null;
     matches.forEach(t => {
       if (t.group && t.group !== lastGroup) {
@@ -1131,12 +1536,39 @@ function initApp() {
       const li = document.createElement('li');
       const a = document.createElement('a');
       a.href = '#' + t.id;
-      a.textContent = t.title;
       a.dataset.id = t.id;
+      // Add checkbox only for non-calculator topics
+      if (t.type !== 'calculator') {
+        const cb = document.createElement('input');
+        cb.type = 'checkbox';
+        cb.className = 'topic-cb';
+        cb.checked = selected.has(t.id);
+        cb.addEventListener('click', (e) => {
+          e.stopPropagation();
+          toggleSelection(t.id, e.target.checked);
+        });
+        a.appendChild(cb);
+      }
+      a.appendChild(document.createTextNode(t.title));
       li.appendChild(a);
       list.appendChild(li);
     });
     highlightActive();
+  }
+
+  // Toast feedback for copy
+  function showToast(msg) {
+    let toast = document.getElementById('toast');
+    if (!toast) {
+      toast = document.createElement('div');
+      toast.id = 'toast';
+      toast.style.cssText = 'position:fixed;bottom:24px;left:50%;transform:translateX(-50%);background:var(--success);color:white;padding:10px 22px;border-radius:8px;font-size:14px;font-weight:500;box-shadow:0 4px 12px rgba(0,0,0,0.15);z-index:1000;opacity:0;transition:opacity 0.2s;pointer-events:none;';
+      document.body.appendChild(toast);
+    }
+    toast.textContent = '✓ ' + msg;
+    toast.style.opacity = '1';
+    clearTimeout(showToast._t);
+    showToast._t = setTimeout(() => { toast.style.opacity = '0'; }, 1500);
   }
 
   function highlightActive() {
@@ -1178,16 +1610,17 @@ function initApp() {
   }
 
   function copyText(text, btnEl) {
-    navigator.clipboard.writeText(text).then(() => {
+    const showFeedback = () => {
       const orig = btnEl.textContent;
       btnEl.classList.add('copied');
       btnEl.textContent = 'הועתק';
+      showToast('הועתק לזיכרון');
       setTimeout(() => {
         btnEl.classList.remove('copied');
         btnEl.textContent = orig;
       }, 1500);
-    }).catch(err => {
-      // Fallback
+    };
+    navigator.clipboard.writeText(text).then(showFeedback).catch(err => {
       const ta = document.createElement('textarea');
       ta.value = text;
       ta.style.position = 'fixed';
@@ -1196,13 +1629,7 @@ function initApp() {
       ta.select();
       try { document.execCommand('copy'); } catch (e) {}
       document.body.removeChild(ta);
-      btnEl.classList.add('copied');
-      const orig = btnEl.textContent;
-      btnEl.textContent = 'הועתק';
-      setTimeout(() => {
-        btnEl.classList.remove('copied');
-        btnEl.textContent = orig;
-      }, 1500);
+      showFeedback();
     });
   }
 
@@ -1218,6 +1645,9 @@ function initApp() {
       if (topic.calc === 'ga') renderCalculatorGA(content);
       else if (topic.calc === 'fwp') renderCalculatorFWP(content);
       else if (topic.calc === 'microcephaly') renderCalculatorMicrocephaly(content);
+      else if (topic.calc === 'bishop') renderCalculatorBishop(content);
+      else if (topic.calc === 'clexane') renderCalculatorClexane(content);
+      else if (topic.calc === 'bmi') renderCalculatorBMI(content);
       if (window.innerWidth <= 768) {
         sidebar.classList.remove('open');
         overlay.classList.remove('show');
@@ -1343,6 +1773,12 @@ function initApp() {
     const id = (location.hash || '').slice(1);
     renderTopic(id);
     highlightActive();
+    // Push to MRU only for non-calc topics
+    const t = TOPICS.find(x => x.id === id);
+    if (t && t.type !== 'calculator') {
+      pushMRU(id);
+      if (!search.value) renderList('');
+    }
   }
 
   search.addEventListener('input', e => renderList(e.target.value));
@@ -1356,8 +1792,52 @@ function initApp() {
     overlay.classList.remove('show');
   });
 
+  // Keyboard shortcuts
+  document.addEventListener('keydown', (e) => {
+    const tag = (e.target && e.target.tagName || '').toLowerCase();
+    const inField = tag === 'input' || tag === 'textarea' || tag === 'select';
+    if (e.key === '/' && !inField) {
+      e.preventDefault();
+      search.focus();
+      search.select();
+    } else if (e.key === 'Escape' && document.activeElement === search) {
+      search.value = '';
+      renderList('');
+      search.blur();
+    } else if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key.toLowerCase() === 'c') {
+      // Copy whole topic
+      const allBtn = document.querySelector('button.copy-all-btn');
+      if (allBtn) {
+        e.preventDefault();
+        allBtn.click();
+      }
+    }
+  });
+
+  // Compose-bar handlers
+  document.querySelector('#compose-bar .btn-compose').addEventListener('click', () => {
+    showComposeView();
+    if (window.innerWidth <= 768) {
+      sidebar.classList.remove('open');
+      overlay.classList.remove('show');
+    }
+    window.scrollTo(0, 0);
+  });
+  document.querySelector('#compose-bar .btn-clear').addEventListener('click', () => {
+    selected.clear();
+    persistSelection();
+    renderList(search.value);
+  });
+
+  // Restore last topic on first load if no hash
+  if (!location.hash) {
+    const mru = getMRU();
+    if (mru.length > 0) location.hash = '#' + mru[0];
+  }
+
   renderList('');
   onHashChange();
+  updateComposeBar();
 }
 </script>
 </body>
