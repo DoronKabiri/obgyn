@@ -591,7 +591,7 @@
   <button class="btn-clear">נקה</button>
 </div>
 
-<script src="topics.enc.js?v=18"></script>
+<script src="topics.enc.js?v=19"></script>
 <script>
 /* ===== Login & decryption ===== */
 async function decryptTopics(encryptedB64, password, iterations) {
@@ -1321,6 +1321,63 @@ function renderCalculatorMicrocephaly(content) {
   });
 }
 
+function renderToolRuptureReview(content) {
+  content.innerHTML = `
+    <h2>כלי סקירת קרעי רחם</h2>
+    <div class="topic-meta">כלי מחקר · בונה מקומי של דף סקירה אינטראקטיבי</div>
+
+    <div class="calc-card">
+      <h3>מה זה?</h3>
+      <p style="line-height:1.7">סקריפט פייתון שבונה דף HTML מאובטח בסיסמה לסקירה ידנית של מקרי קרע רחם מתוך MDClone. רץ לוקאלית בלבד, ללא חיבור לאינטרנט. מתאים גם לרשתות סגורות (בית-חולים).</p>
+
+      <h3 style="margin-top:18px">דרישות</h3>
+      <ul style="line-height:1.8">
+        <li>Python 3.8+ (פייתון רגיל, לא דורש Jupyter)</li>
+        <li>3 חבילות: <code>pandas</code>, <code>openpyxl</code>, <code>cryptography</code></li>
+        <li>6 קבצי קלט (XLSX + CSV של MDClone) שיש להעתיק לאותה תיקייה כמו הסקריפט</li>
+      </ul>
+
+      <h3 style="margin-top:18px">הפעלה (אחרי העתקת הקבצים)</h3>
+      <pre style="background:#f3f3f3;padding:10px;border-radius:6px;direction:ltr;text-align:left;unicode-bidi:plaintext">pip install -r requirements.txt
+python3 build_review.py</pre>
+      <p style="margin-top:8px;color:#555;font-size:0.9em">קובץ הפלט: <code>rupture_review_INTERACTIVE_v2.html</code> (כ-11 MB) - פתחי בדפדפן, סיסמה: <code>Rupture</code>.</p>
+    </div>
+
+    <div class="calc-card" style="margin-top:18px">
+      <h3>הורדות</h3>
+      <p style="color:#555;font-size:0.9em">המחשב שלך עלול לחסום סוגי קבצים מסוימים. אם אחת לא עובדת, נסי אחרת:</p>
+
+      <h4 style="margin-top:14px;margin-bottom:6px">אופציה 1: חבילה ZIP מאוגדת (הכי פשוט)</h4>
+      <p>
+        <a href="tools/rupture_review_builder.zip" download class="copy-summary-btn" style="display:inline-block;text-decoration:none">📦 הורד rupture_review_builder.zip</a>
+      </p>
+
+      <h4 style="margin-top:18px;margin-bottom:6px">אופציה 2: קבצים נפרדים</h4>
+      <p>
+        <a href="tools/rupture_review_builder/build_review.py" download style="display:block;margin-bottom:6px">📄 build_review.py (הסקריפט הראשי)</a>
+        <a href="tools/rupture_review_builder/README.md" download style="display:block;margin-bottom:6px">📄 README.md (הוראות הפעלה)</a>
+        <a href="tools/rupture_review_builder/requirements.txt" download style="display:block">📄 requirements.txt (רשימת חבילות)</a>
+      </p>
+
+      <h4 style="margin-top:18px;margin-bottom:6px">אופציה 3: גרסת GitHub (לעת עתה — להוסיף כ-Release)</h4>
+      <p style="color:#555;font-size:0.9em">לא זמין עדיין. נסי קודם את האופציות הראשונות.</p>
+    </div>
+
+    <div class="calc-card" style="margin-top:18px">
+      <h3>קבצי קלט נדרשים</h3>
+      <ol style="line-height:1.8">
+        <li><code>rupture_TRUE_only.xlsx</code> — פלט סיווג 584 הקיסים</li>
+        <li><code>rupture_full_cohort_extract.xlsx</code> — טקסט חופשי מ-20 הטבלאות</li>
+        <li><code>v_BFR_25.csv</code> — נתוני קבלה (שבוע הריון)</li>
+        <li><code>v_BFR_26.csv</code> — נוסחה מיילדותית</li>
+        <li><code>v_BFR_60.csv</code> — פרטי לידה</li>
+        <li><code>v_BFR_61.csv</code> — פרטי יילוד (אפגר, משקל)</li>
+      </ol>
+      <p style="color:#555;font-size:0.9em;margin-top:10px">קבצי הקלט נמצאים אצלך - לא בריפו (הם מכילים PHI).</p>
+    </div>
+  `;
+}
+
 function attachCopySummary(parentEl) {
   parentEl.querySelectorAll('.copy-summary-btn').forEach(btn => {
     btn.addEventListener('click', () => {
@@ -1385,7 +1442,7 @@ function initApp() {
   // Compose: merge selected topics into one letter
   function composeLetter() {
     if (selected.size === 0) return '';
-    const ordered = TOPICS.filter(t => selected.has(t.id) && t.type !== 'calculator');
+    const ordered = TOPICS.filter(t => selected.has(t.id) && t.type !== 'calculator' && t.type !== 'tool');
     if (ordered.length === 0) return '';
     const parts = [];
     let recCounter = 0;
@@ -1463,7 +1520,7 @@ function initApp() {
     }
     const count = [...selected].filter(id => {
       const t = TOPICS.find(x => x.id === id);
-      return t && t.type !== 'calculator';
+      return t && t.type !== 'calculator' && t.type !== 'tool';
     }).length;
     content.innerHTML = `
       <div id="compose-view">
@@ -1537,8 +1594,8 @@ function initApp() {
       const a = document.createElement('a');
       a.href = '#' + t.id;
       a.dataset.id = t.id;
-      // Add checkbox only for non-calculator topics
-      if (t.type !== 'calculator') {
+      // Add checkbox only for content topics (not calculators/tools)
+      if (t.type !== 'calculator' && t.type !== 'tool') {
         const cb = document.createElement('input');
         cb.type = 'checkbox';
         cb.className = 'topic-cb';
@@ -1648,6 +1705,18 @@ function initApp() {
       else if (topic.calc === 'bishop') renderCalculatorBishop(content);
       else if (topic.calc === 'clexane') renderCalculatorClexane(content);
       else if (topic.calc === 'bmi') renderCalculatorBMI(content);
+      if (window.innerWidth <= 768) {
+        sidebar.classList.remove('open');
+        overlay.classList.remove('show');
+      }
+      content.scrollTo(0, 0);
+      window.scrollTo(0, 0);
+      return;
+    }
+
+    // Tool topics: render with dedicated tool UI (download page)
+    if (topic.type === 'tool') {
+      if (topic.tool === 'rupture_review') renderToolRuptureReview(content);
       if (window.innerWidth <= 768) {
         sidebar.classList.remove('open');
         overlay.classList.remove('show');
@@ -1773,9 +1842,9 @@ function initApp() {
     const id = (location.hash || '').slice(1);
     renderTopic(id);
     highlightActive();
-    // Push to MRU only for non-calc topics
+    // Push to MRU only for content topics (not calculators/tools)
     const t = TOPICS.find(x => x.id === id);
-    if (t && t.type !== 'calculator') {
+    if (t && t.type !== 'calculator' && t.type !== 'tool') {
       pushMRU(id);
       if (!search.value) renderList('');
     }
