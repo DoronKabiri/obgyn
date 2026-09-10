@@ -196,6 +196,10 @@
     line-height: 1.8;
     white-space: pre-wrap;
   }
+  #compose-view .compose-chips { display: flex; flex-wrap: wrap; gap: 8px; margin: 10px 0 14px; }
+  #compose-view .chip { display: inline-flex; align-items: center; gap: 6px; padding: 5px 10px; border-radius: 999px; background: var(--bg-secondary, #eef2f7); color: var(--text); font-size: 13px; border: 1px solid var(--border); }
+  #compose-view .chip button { border: none; background: transparent; color: var(--text-muted); cursor: pointer; font-size: 13px; padding: 0 2px; line-height: 1; }
+  #compose-view .chip button:hover { color: #b91c1c; }
   #compose-view .compose-meta {
     color: var(--text-muted);
     font-size: 14px;
@@ -437,6 +441,45 @@
   .calc-result .copy-summary-btn:hover { background: var(--primary); color: white; }
   .calc-result .copy-summary-btn.copied { background: var(--success); color: white; border-color: var(--success); }
   .calc-result .copy-summary-btn.copied::before { content: "✓ "; }
+  /* ===== PDF vault ===== */
+  .vault-drop {
+    border: 2px dashed var(--primary-light);
+    border-radius: 12px;
+    padding: 28px 20px;
+    text-align: center;
+    color: var(--text-muted);
+    background: var(--hover);
+    cursor: pointer;
+    transition: background 0.15s, border-color 0.15s;
+    margin-bottom: 14px;
+  }
+  .vault-drop.over { background: var(--card-bg); border-color: var(--primary); border-style: solid; }
+  .vault-drop strong { color: var(--primary); display: block; font-size: 16px; margin-bottom: 4px; }
+  .vault-drop input[type=file] { display: none; }
+  .vault-list { list-style: none; margin: 0; padding: 0; }
+  .vault-list li {
+    display: flex; align-items: center; gap: 12px;
+    padding: 12px 14px; border: 1px solid var(--border); border-radius: 10px;
+    margin-bottom: 8px; background: var(--card-bg);
+  }
+  .vault-list .vname { flex: 1; font-weight: 500; word-break: break-all; }
+  .vault-list .vsize { color: var(--text-muted); font-size: 13px; white-space: nowrap; }
+  .vault-list button { padding: 7px 14px; border-radius: 6px; border: none; cursor: pointer; font-family: inherit; font-size: 13px; font-weight: 500; }
+  .vault-list .vdl { background: var(--primary); color: white; }
+  .vault-list .vdel { background: transparent; color: #b91c1c; border: 1px solid #fecaca; }
+  .vault-status { font-size: 13px; color: var(--text-muted); margin: 8px 0; min-height: 18px; }
+  .vault-status.err { color: #b91c1c; }
+  .vault-status.ok { color: var(--success); }
+  .vault-token { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+  .vault-token input { flex: 1; min-width: 220px; padding: 8px 10px; border: 1px solid var(--border); border-radius: 6px; font-family: monospace; font-size: 13px; background: var(--card-bg); color: var(--text); }
+  .vault-progress { height: 6px; background: var(--border); border-radius: 3px; overflow: hidden; margin-top: 8px; display: none; }
+  .vault-progress div { height: 100%; width: 0; background: var(--primary); transition: width 0.2s; }
+  details.vault-help summary { cursor: pointer; color: var(--primary); font-size: 14px; font-weight: 500; }
+  details.vault-upload { margin-top: 16px; }
+  details.vault-upload > summary { font-size: 15px; padding: 10px 0; }
+  details.vault-upload > .calc-card { margin-top: 8px; }
+  details.vault-help ol { font-size: 14px; color: var(--text); padding-inline-start: 22px; }
+
   .calc-help {
     font-size: 12px;
     color: var(--text-muted);
@@ -689,7 +732,9 @@ function formatRemaining(sec) {
     try {
       runAppCode(saved);
       overlay.classList.add('hidden');
-      initApp();
+      // Defer: this IIFE runs mid-script, before later top-level const declarations
+      // (PCT_TABLES, VAULT_* etc.) are initialized. Rendering synchronously here hits the TDZ.
+      setTimeout(initApp, 0);
       return;
     } catch (e) {
       sessionStorage.removeItem('obgyn-decrypted');
@@ -704,14 +749,11 @@ function formatRemaining(sec) {
     btn.disabled = true;
     btn.textContent = 'מפענח...';
     errEl.textContent = '';
+    let code;
     try {
-      const code = await decryptTopics(window.ENCRYPTED_TOPICS, pw, window.PBKDF2_ITERATIONS || 250000);
-      runAppCode(code);
-      resetFailures();
-      sessionStorage.setItem('obgyn-decrypted', code);
-      overlay.classList.add('hidden');
-      initApp();
+      code = await decryptTopics(window.ENCRYPTED_TOPICS, pw, window.PBKDF2_ITERATIONS || 250000);
     } catch (err) {
+      code = null;
       recordFailure();
       const s = getLockoutState();
       btn.textContent = 'כניסה';
@@ -724,10 +766,31 @@ function formatRemaining(sec) {
         pwField.select();
       }
     }
+    if (code === null) return;
+    // Decryption succeeded: any error from here on is not a password problem
+    try {
+      runAppCode(code);
+      resetFailures();
+      try {
+        sessionStorage.setItem('obgyn-decrypted', code);
+        sessionStorage.setItem('obgyn-pw', pw);
+      } catch (e) {}
+      overlay.classList.add('hidden');
+      initApp();
+    } catch (err) {
+      console.error(err);
+      btn.textContent = 'כניסה';
+      btn.disabled = false;
+      errEl.textContent = 'הסיסמה נכונה אך טעינת התוכן נכשלה. רענן את הדף ונסה שוב.';
+    }
   });
 
   document.getElementById('logout-btn').addEventListener('click', () => {
     sessionStorage.removeItem('obgyn-decrypted');
+    sessionStorage.removeItem('obgyn-pw');
+    if (localStorage.getItem('obgyn-gh-token') && confirm('למחוק גם את טוקן ההעלאה של הכספת השמור במחשב זה? מומלץ במחשב משותף.')) {
+      localStorage.removeItem('obgyn-gh-token');
+    }
     location.reload();
   });
 })();
@@ -920,27 +983,27 @@ function microcephalyClassify(z) {
     return {
       label: "בטווח התקין (לא מתחת ל-2SD)",
       cls: "",
-      recommendation: "היקף הראש בטווח התקין לפי נייר עמדה 31. אין צורך בבירור ייעודי למיקרוצפליה. המשך מעקב הריון רגיל."
+      recommendation: "היקף הראש בטווח התקין. אין צורך בבירור ייעודי למיקרוצפליה. המשך מעקב הריון רגיל."
     };
   }
   if (z > -3) {
     return {
       label: "חשד למיקרוצפליה (בין -2SD ל--3SD)",
       cls: "warn",
-      recommendation: "מומלץ בירור לפי נייר עמדה 31 של האיגוד הישראלי לגינקולוגיה ומיילדות:\n1. אישור גיל הריון מדויק (חיוני; ייעוץ עלול להיות לא מדויק בהיעדר אישור).\n2. הערכה ביומטרית וביופיזיקאלית של העובר.\n3. בדיקת על-שמע מכוונת למבנה המוח: חתכים אקסיאליים (החריץ האינטר-המיספרי, CSP, חדרים לטרליים עם רוחב האטריום, חדר שלישי ותלמוס, מוחון, חדר רביעי, וורמיס וציסטרנה מאגנה), חתך מיד-סגיטאלי (קורפוס קלוסום ווורמיס), וחתך קורונלי (קרניים קדמיות, CSP).\n4. השלמת סקירת מערכות אם לא בוצעה.\n5. השוואה למגמת גדילת ראש בבדיקות קודמות.\n6. הפניה לייעוץ גנטי וסקר STORCH.\n7. מעקב סונוגרפי בפער שלא יקטן מ-3 שבועות.\n8. במקרה של ממצא חריג בבדיקה הסונוגרפית או בדיקה לא מספקת, הפניה ל-MRI מוח עוברי.\n\nנתון פרוגנוסטי (נייר עמדה 31): בכ-90% מהעוברים בטווח זה, היקף הראש לאחר הלידה תקין. סיכון לפיגור שכלי (IQ מתחת ל-70) הינו כ-10.5%."
+      recommendation: "מומלץ בירור:\n1. אישור גיל הריון מדויק (חיוני; ייעוץ עלול להיות לא מדויק בהיעדר אישור).\n2. הערכה ביומטרית וביופיזיקאלית של העובר.\n3. בדיקת על-שמע מכוונת למבנה המוח: חתכים אקסיאליים (החריץ האינטר-המיספרי, CSP, חדרים לטרליים עם רוחב האטריום, חדר שלישי ותלמוס, מוחון, חדר רביעי, וורמיס וציסטרנה מאגנה), חתך מיד-סגיטאלי (קורפוס קלוסום ווורמיס), וחתך קורונלי (קרניים קדמיות, CSP).\n4. השלמת סקירת מערכות אם לא בוצעה.\n5. השוואה למגמת גדילת ראש בבדיקות קודמות.\n6. הפניה לייעוץ גנטי וסקר STORCH.\n7. מעקב סונוגרפי בפער שלא יקטן מ-3 שבועות.\n8. במקרה של ממצא חריג בבדיקה הסונוגרפית או בדיקה לא מספקת, הפניה ל-MRI מוח עוברי.\n\nנתון פרוגנוסטי: בכ-90% מהעוברים בטווח זה, היקף הראש לאחר הלידה תקין. סיכון לפיגור שכלי (IQ מתחת ל-70) הינו כ-10.5%."
     };
   }
   if (z > -4) {
     return {
       label: "מיקרוצפליה (בין -3SD ל--4SD)",
       cls: "warn",
-      recommendation: "אבחנת מיקרוצפליה לפי הגדרת נייר עמדה 31 (HC מתחת ל--3SD). בנוסף לבירור הסטנדרטי, מומלץ:\n1. MRI של מוח העובר.\n2. ייעוץ נוירולוג ילדים.\n3. ייעוץ גנטי מורחב + סקר STORCH.\n4. דיון מסכם במסגרת ייעוץ מקצועי רב-תחומי (גנטיקה, נוירולוגית עובר, נוירולוג ילדים, מרפאת הריון בסיכון).\n\nנתון פרוגנוסטי (נייר עמדה 31): סיכון לפיגור שכלי (IQ מתחת ל-70) הינו כ-51.2%."
+      recommendation: "אבחנת מיקרוצפליה (היקף ראש נמוך משלוש סטיות תקן מתחת לממוצע). בנוסף לבירור הסטנדרטי, מומלץ:\n1. MRI של מוח העובר.\n2. ייעוץ נוירולוג ילדים.\n3. ייעוץ גנטי מורחב + סקר STORCH.\n4. דיון מסכם במסגרת ייעוץ מקצועי רב-תחומי (גנטיקה, נוירולוגית עובר, נוירולוג ילדים, מרפאת הריון בסיכון).\n\nנתון פרוגנוסטי: סיכון לפיגור שכלי (IQ מתחת ל-70) הינו כ-51.2%."
     };
   }
   return {
     label: "מיקרוצפליה חמורה (מתחת ל--4SD)",
     cls: "warn",
-    recommendation: "מיקרוצפליה חמורה. נדרש בירור מקיף לפי נייר עמדה 31:\n1. MRI של מוח העובר.\n2. ייעוץ נוירולוג ילדים דחוף.\n3. ייעוץ גנטי מורחב + סקר STORCH.\n4. דיון מסכם רב-תחומי לגבי המשך ההריון.\n\nנתון פרוגנוסטי (נייר עמדה 31): סיכון לפיגור שכלי קרוב ל-100%."
+    recommendation: "מיקרוצפליה חמורה. נדרש בירור מקיף:\n1. MRI של מוח העובר.\n2. ייעוץ נוירולוג ילדים דחוף.\n3. ייעוץ גנטי מורחב + סקר STORCH.\n4. דיון מסכם רב-תחומי לגבי המשך ההריון.\n\nנתון פרוגנוסטי: סיכון לפיגור שכלי קרוב ל-100%."
   };
 }
 
@@ -1182,7 +1245,7 @@ function renderCalculatorBishop(content) {
     let cls = '', label = '', plan = '';
     if (score >= 8) { cls = 'good'; label = 'צוואר בשל (Favorable)'; plan = 'ניתן לזירוז ישיר עם אוקסיטוצין +/- ARM.'; }
     else if (score >= 7) { label = 'גבולי'; plan = 'זירוז ישיר אפשרי, או הבשלה צווארית קלה.'; }
-    else { cls = 'warn'; label = 'לא בשל (Unfavorable)'; plan = 'הבשלה צווארית טרם זירוז: בלון, PGE2 (Propess) או PGE1 (Misoprostol, off-label). שילובים אפשריים.'; }
+    else { cls = 'warn'; label = 'לא בשל (Unfavorable)'; plan = 'הבשלה צווארית טרם זירוז: בלון, PGE2 (Propess) או PGE1 (Misoprostol, off-label). שילובים אפשריים. אין להשתמש ב-PGE1 לאחר ניתוח קיסרי בעבר.'; }
     const summary = `Bishop Score: ${score}/13 (פתיחה ${dil}, מחיקה ${eff}, station ${sta}, גמישות ${con}, מיקום ${pos}). ${label}.`;
     document.getElementById('b-result').innerHTML = `<div class="calc-result ${cls}"><div class="result-line"><strong>Bishop Score:</strong> ${score}/13</div><div class="result-line"><strong>סיווג:</strong> ${label}</div><div class="result-line" style="margin-top: 8px;"><strong>גישה מומלצת:</strong></div><div class="result-line">${plan}</div><button class="copy-summary-btn" data-text="${escapeHtml(summary)}">העתק לסיכום</button></div>`;
     attachCopySummary(document.getElementById('b-result'));
@@ -1304,7 +1367,7 @@ function renderCalculatorMicrocephaly(content) {
     const recLines = cls.recommendation.split('\n').map(line =>
       `<div class="result-line">${escapeHtml(line)}</div>`
     ).join('');
-    const summary = `HC עוברי בשבוע ${w}: ${hc} מ״מ. ממוצע לשבוע זה ${r.mean} מ״מ (SD ${r.sd} מ״מ). מספר סטיות תקן מהממוצע: ${zSigned}. סיווג: ${cls.label}. מקור: Chervenak, נייר עמדה 31.`;
+    const summary = `HC עוברי בשבוע ${w}: ${hc} מ״מ. ממוצע לשבוע זה ${r.mean} מ״מ (SD ${r.sd} מ״מ). מספר סטיות תקן מהממוצע: ${zSigned}. סיווג: ${cls.label}.`;
     out.innerHTML = `
       <div class="calc-result ${cls.cls}">
         <div class="result-line"><strong>גיל הריון:</strong> ${w} שבועות מלאים</div>
@@ -1319,6 +1382,256 @@ function renderCalculatorMicrocephaly(content) {
     `;
     attachCopySummary(out);
   });
+}
+
+/* ===== PDF vault: client-side AES-256-GCM, files stored in repo docs/ via GitHub API ===== */
+const VAULT_OWNER = 'DoronKabiri', VAULT_REPO = 'obgyn', VAULT_DIR = 'docs';
+// Optional: URL of the upload service (tools/vault-worker). When set, upload and delete work with the site password only, no personal token.
+const VAULT_ENDPOINT = '';
+const VAULT_TOKEN_KEY = 'obgyn-gh-token';
+
+async function vaultDeriveKey(password, salt, usages) {
+  const km = await crypto.subtle.importKey('raw', new TextEncoder().encode(password), { name: 'PBKDF2' }, false, ['deriveKey']);
+  return crypto.subtle.deriveKey({ name: 'PBKDF2', salt, iterations: window.PBKDF2_ITERATIONS || 250000, hash: 'SHA-256' }, km, { name: 'AES-GCM', length: 256 }, false, usages);
+}
+async function vaultEncrypt(bytes, password) {
+  const salt = crypto.getRandomValues(new Uint8Array(16));
+  const iv = crypto.getRandomValues(new Uint8Array(12));
+  const key = await vaultDeriveKey(password, salt, ['encrypt']);
+  const ct = new Uint8Array(await crypto.subtle.encrypt({ name: 'AES-GCM', iv }, key, bytes));
+  const out = new Uint8Array(16 + 12 + ct.length);
+  out.set(salt, 0); out.set(iv, 16); out.set(ct, 28);
+  return out;
+}
+async function vaultDecrypt(blob, password) {
+  const salt = blob.slice(0, 16), iv = blob.slice(16, 28), ct = blob.slice(28);
+  const key = await vaultDeriveKey(password, salt, ['decrypt']);
+  return new Uint8Array(await crypto.subtle.decrypt({ name: 'AES-GCM', iv }, key, ct));
+}
+function bytesToB64(bytes) {
+  let s = ''; const chunk = 0x8000;
+  for (let i = 0; i < bytes.length; i += chunk) s += String.fromCharCode.apply(null, bytes.subarray(i, i + chunk));
+  return btoa(s);
+}
+function fmtSize(n) { return n < 1024 * 1024 ? (n / 1024).toFixed(0) + ' KB' : (n / 1048576).toFixed(1) + ' MB'; }
+function ghHeaders(token) {
+  const h = { 'Accept': 'application/vnd.github+json' };
+  if (token) h['Authorization'] = 'Bearer ' + token;
+  return h;
+}
+
+function renderPdfVault(content) {
+  const pw = sessionStorage.getItem('obgyn-pw') || '';
+  content.innerHTML = `
+    <h2>מסמכי PDF</h2>
+    <div class="topic-meta">כספת מסמכים. כל קובץ מוצפן בדפדפן בסיסמת האתר לפני שהוא נשמר, ומפוענח רק בהורדה. שים לב: הפענוח דורש את הסיסמה שבה הקובץ הוצפן, לכן אם סיסמת האתר תוחלף יש להוריד את המסמכים לפני ההחלפה ולהעלותם מחדש.</div>
+
+    <div class="calc-card">
+      <h3>מסמכים שמורים</h3>
+      <div class="vault-status" id="vault-list-status">טוען...</div>
+      <ul class="vault-list" id="vault-list"></ul>
+      <button class="copy-summary-btn" id="vault-refresh" style="margin-top:6px">רענן רשימה</button>
+    </div>
+
+    <details class="vault-help vault-upload" id="vault-upload-box">
+      <summary>העלאת מסמך (למי שמנהל את האתר)</summary>
+    <div class="calc-card">
+      <h3>העלאת מסמך</h3>
+      <div class="vault-drop" id="vault-drop" role="button" tabindex="0" aria-label="בחירת קובץ PDF להעלאה">
+        <strong>גרור לכאן קובץ PDF, או לחץ לבחירה</strong>
+        <span>תוכן הקובץ מוצפן במחשב שלך, אך שם הקובץ נשמר כפי שהוא וגלוי באינטרנט. אין לכלול בשם הקובץ שם מטופלת, מספר זהות או מספר מקרה.</span>
+        <input type="file" id="vault-file" accept="application/pdf,.pdf" multiple>
+      </div>
+      <div class="vault-progress" id="vault-progress"><div></div></div>
+      <div class="vault-status" id="vault-up-status"></div>
+      <details class="vault-help" id="vault-token-box">
+        <summary>הגדרה חד-פעמית למחשב זה: טוקן GitHub להעלאה ישירה</summary>
+        <ol>
+          <li>GitHub ← Settings ← Developer settings ← Personal access tokens ← <b>Fine-grained tokens</b> ← Generate new token.</li>
+          <li>Repository access: <b>Only select repositories</b> ← בחר <b>obgyn</b>.</li>
+          <li>Permissions ← Repository permissions ← <b>Contents: Read and write</b>. תוקף: שנה.</li>
+          <li>Generate, העתק, והדבק כאן. הטוקן נשמר רק בדפדפן הזה (localStorage) ולא נשלח לשום מקום מלבד GitHub.</li>
+        </ol>
+        <div class="vault-token">
+          <input type="password" id="vault-token" placeholder="github_pat_..." autocomplete="off">
+          <button class="calc-btn" id="vault-token-save">שמור</button>
+          <button class="copy-all-btn" id="vault-token-clear" style="background:transparent;color:var(--text-muted);border-color:var(--border)">מחק</button>
+        </div>
+        <div class="vault-status" id="vault-token-status"></div>
+        <p style="font-size:13px;color:var(--text-muted);margin:10px 0 0">ללא טוקן: הדף יצפין את הקובץ ויוריד אותו בשם <code>.enc</code>, ואתה מעלה אותו ידנית ב-GitHub לתיקייה <code>docs</code>. ההורדה והפענוח מהדף עובדים בכל מקרה.</p>
+      </details>
+    </div>
+    </details>
+  `;
+
+  const drop = document.getElementById('vault-drop');
+  const fileInput = document.getElementById('vault-file');
+  const upStatus = document.getElementById('vault-up-status');
+  const prog = document.getElementById('vault-progress');
+  const progBar = prog.firstElementChild;
+  const listEl = document.getElementById('vault-list');
+  const listStatus = document.getElementById('vault-list-status');
+  const tokenInput = document.getElementById('vault-token');
+  const tokenStatus = document.getElementById('vault-token-status');
+  const tokenBox = document.getElementById('vault-token-box');
+
+  const getToken = () => localStorage.getItem(VAULT_TOKEN_KEY) || '';
+  const setStatus = (el, msg, cls) => { el.textContent = msg; el.className = 'vault-status' + (cls ? ' ' + cls : ''); };
+  const refreshTokenUI = () => {
+    const t = getToken();
+    tokenInput.value = t;
+    setStatus(tokenStatus, t ? 'טוקן שמור במחשב זה. העלאה ישירה פעילה.' : 'אין טוקן. העלאה תתבצע כהורדת קובץ מוצפן.', t ? 'ok' : '');
+    if (VAULT_ENDPOINT) tokenBox.style.display = 'none';
+  };
+  refreshTokenUI();
+  document.getElementById('vault-token-save').addEventListener('click', () => {
+    const v = tokenInput.value.trim();
+    if (!v) { setStatus(tokenStatus, 'לא הוזן טוקן.', 'err'); return; }
+    localStorage.setItem(VAULT_TOKEN_KEY, v);
+    refreshTokenUI(); loadList();
+  });
+  document.getElementById('vault-token-clear').addEventListener('click', () => {
+    localStorage.removeItem(VAULT_TOKEN_KEY); refreshTokenUI();
+  });
+
+  const apiBase = `https://api.github.com/repos/${VAULT_OWNER}/${VAULT_REPO}/contents/${VAULT_DIR}`;
+
+  async function loadList() {
+    setStatus(listStatus, 'טוען...');
+    listEl.innerHTML = '';
+    try {
+      const r = await fetch(apiBase + '?ref=main&t=' + Date.now(), { headers: ghHeaders(getToken()), cache: 'no-store' });
+      if (r.status === 404) { setStatus(listStatus, 'אין מסמכים עדיין.'); return; }
+      if (!r.ok) throw new Error('GitHub ' + r.status);
+      const items = (await r.json()).filter(x => x.type === 'file' && x.name.endsWith('.enc'));
+      if (!items.length) { setStatus(listStatus, 'אין מסמכים עדיין.'); return; }
+      setStatus(listStatus, items.length === 1 ? 'מסמך אחד' : `${items.length} מסמכים`);
+      items.sort((a, b) => a.name.localeCompare(b.name, 'he'));
+      items.forEach(it => {
+        const li = document.createElement('li');
+        const display = it.name.replace(/\.enc$/, '');
+        li.innerHTML = `<span class="vname">📄 ${escapeHtml(display)}</span><span class="vsize">${fmtSize(it.size)}</span><button class="vdl">הורד</button><button class="vdel" title="מחיקה מהאתר">מחק</button>`;
+        li.querySelector('.vdl').addEventListener('click', (e) => downloadItem(it, display, e.currentTarget));
+        li.querySelector('.vdel').addEventListener('click', () => deleteItem(it, display));
+        listEl.appendChild(li);
+      });
+    } catch (e) {
+      const hint = /401|403/.test(e.message) ? ' ייתכן שהטוקן שגוי או שפג תוקפו, או שחרגת ממגבלת הפניות של GitHub. נסה שוב בעוד כמה דקות.' : ' בדוק את חיבור האינטרנט ונסה שוב.';
+      setStatus(listStatus, 'לא ניתן לטעון את רשימת המסמכים.' + hint, 'err');
+    }
+  }
+
+  async function downloadItem(it, display, btn) {
+    if (!pw) { alert('סיסמת האתר אינה זמינה בסשן זה. התנתק והתחבר מחדש.'); return; }
+    const orig = btn.textContent; btn.textContent = 'מפענח...'; btn.disabled = true;
+    try {
+      const r = await fetch(it.download_url + '?t=' + Date.now(), { cache: 'no-store' });
+      if (!r.ok) throw new Error('הורדה נכשלה ' + r.status);
+      const enc = new Uint8Array(await r.arrayBuffer());
+      const plain = await vaultDecrypt(enc, pw);
+      const blob = new Blob([plain], { type: 'application/pdf' });
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(blob); a.download = display; document.body.appendChild(a); a.click();
+      setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 2000);
+      btn.textContent = 'הורד ✓';
+    } catch (e) {
+      alert('לא ניתן לפתוח את המסמך. הקובץ הוצפן בסיסמת אתר אחרת, או שההורדה נקטעה. נסה שוב, ואם התקלה חוזרת פנה למי שהעלה את הקובץ.');
+      btn.textContent = orig;
+    } finally { btn.disabled = false; setTimeout(() => { btn.textContent = orig; }, 2000); }
+  }
+
+  async function deleteItem(it, display) {
+    const token = getToken();
+    if (!token && !VAULT_ENDPOINT) { alert('מחיקה דורשת טוקן GitHub (או מחיקה ידנית ברפו).'); return; }
+    if (!confirm(`למחוק את "${display}" מהאתר? הפעולה אינה הפיכה.`)) return;
+    try {
+      const r = VAULT_ENDPOINT
+        ? await fetch(VAULT_ENDPOINT, { method: 'DELETE', headers: { 'Authorization': 'Bearer ' + pw, 'Content-Type': 'application/json' }, body: JSON.stringify({ name: it.name }) })
+        : await fetch(apiBase + '/' + encodeURIComponent(it.name), {
+        method: 'DELETE', headers: { ...ghHeaders(token), 'Content-Type': 'application/json' },
+        body: JSON.stringify({ message: 'Delete ' + it.name, sha: it.sha, branch: 'main' }),
+      });
+      if (!r.ok) throw new Error('GitHub ' + r.status);
+      loadList();
+    } catch (e) { alert('מחיקה נכשלה: ' + e.message); }
+  }
+
+  async function handleFiles(files) {
+    if (!pw) { setStatus(upStatus, 'סיסמת האתר אינה זמינה בסשן זה. התנתק והתחבר מחדש.', 'err'); return; }
+    const list = Array.from(files).filter(f => /\.pdf$/i.test(f.name) || f.type === 'application/pdf');
+    if (!list.length) { setStatus(upStatus, 'ניתן להעלות קבצי PDF בלבד. הקובץ שנבחר אינו PDF.', 'err'); return; }
+    const skipped = Array.from(files).length - list.length;
+    if (skipped > 0) alert(`${skipped} קבצים שאינם PDF לא יועלו. רק קבצי PDF נתמכים.`);
+    const token = getToken();
+    prog.style.display = 'block';
+    for (let i = 0; i < list.length; i++) {
+      const f = list[i];
+      progBar.style.width = Math.round((i / list.length) * 100) + '%';
+      if (f.size > 24 * 1024 * 1024) { setStatus(upStatus, `${f.name}: גדול מ-24 מגה-בייט ולכן לא הועלה.`, 'err'); alert(`${f.name} גדול מ-24 מגה-בייט ולכן לא הועלה. שאר הקבצים ימשיכו כרגיל.`); continue; }
+      setStatus(upStatus, `מצפין ${f.name}...`);
+      const enc = await vaultEncrypt(new Uint8Array(await f.arrayBuffer()), pw);
+      const encName = f.name + '.enc';
+      if (VAULT_ENDPOINT) {
+        setStatus(upStatus, `מעלה ${f.name}...`);
+        try {
+          const send = (overwrite) => fetch(VAULT_ENDPOINT, { method: 'POST', headers: { 'Authorization': 'Bearer ' + pw, 'Content-Type': 'application/json' }, body: JSON.stringify({ name: encName, content: bytesToB64(enc), overwrite }) });
+          let r = await send(false);
+          if (r.status === 409) {
+            if (!confirm(`בכספת כבר קיים מסמך בשם "${f.name}". להחליף אותו? המסמך הקודם יימחק.`)) { setStatus(upStatus, `${f.name}: לא הועלה, קיים מסמך באותו שם.`, 'err'); continue; }
+            r = await send(true);
+          }
+          if (!r.ok) throw new Error('service ' + r.status);
+          setStatus(upStatus, `${f.name} הועלה בהצלחה. הופעתו ברשימה עשויה להתעכב עד כדקה.`, 'ok');
+        } catch (e) {
+          const hint = /401/.test(e.message) ? 'סיסמת האתר אינה תואמת את שירות ההעלאה.' : 'בדוק את חיבור האינטרנט ונסה שוב.';
+          setStatus(upStatus, `${f.name}: ההעלאה נכשלה. ${hint}`, 'err'); alert(`${f.name}: ההעלאה נכשלה. ${hint}`);
+        }
+        continue;
+      }
+      if (!token) {
+        const a = document.createElement('a');
+        a.href = URL.createObjectURL(new Blob([enc])); a.download = encName; document.body.appendChild(a); a.click();
+        setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 2000);
+        tokenBox.open = true;
+        setStatus(upStatus, `${encName} נשמר בתיקיית ההורדות במחשב זה (מוצפן), אך עדיין אינו בכספת ולא יופיע ברשימה. להעלאה ישירה מהדפדפן יש להגדיר טוקן פעם אחת (ההסבר נפתח למעלה), או להעלות את הקובץ ידנית לתיקיית docs באתר GitHub.`);
+        continue;
+      }
+      setStatus(upStatus, `מעלה ${f.name} ל-GitHub...`);
+      try {
+        // Check existing (to get sha for overwrite)
+        let sha;
+        const chk = await fetch(apiBase + '/' + encodeURIComponent(encName) + '?ref=main&t=' + Date.now(), { headers: ghHeaders(token), cache: 'no-store' });
+        if (chk.ok) {
+          sha = (await chk.json()).sha;
+          if (!confirm(`בכספת כבר קיים מסמך בשם "${f.name}". להחליף אותו? המסמך הקודם יימחק.`)) { setStatus(upStatus, `${f.name}: לא הועלה, קיים מסמך באותו שם.`, 'err'); continue; }
+        }
+        const body = { message: 'Add ' + encName, content: bytesToB64(enc), branch: 'main' };
+        if (sha) body.sha = sha;
+        const r = await fetch(apiBase + '/' + encodeURIComponent(encName), {
+          method: 'PUT', headers: { ...ghHeaders(token), 'Content-Type': 'application/json' }, body: JSON.stringify(body),
+        });
+        if (!r.ok) { const t = await r.text(); throw new Error('GitHub ' + r.status + ' ' + t.slice(0, 120)); }
+        setStatus(upStatus, `${f.name} הועלה בהצלחה. הופעתו ברשימה עשויה להתעכב עד כדקה.`, 'ok');
+      } catch (e) {
+        const hint = /401/.test(e.message) ? 'הטוקן שגוי או שפג תוקפו. יש להזין טוקן חדש בהגדרה שלמעלה.' : /403/.test(e.message) ? 'לטוקן אין הרשאת כתיבה לרפו, או שחרגת ממגבלת הפניות של GitHub.' : /404/.test(e.message) ? 'הרפו לא נמצא או שלטוקן אין גישה אליו.' : 'בדוק את חיבור האינטרנט ונסה שוב.';
+        setStatus(upStatus, `${f.name}: ההעלאה נכשלה. ${hint}`, 'err');
+        alert(`${f.name}: ההעלאה נכשלה. ${hint}`);
+      }
+    }
+    progBar.style.width = '100%';
+    setTimeout(() => { prog.style.display = 'none'; progBar.style.width = '0'; }, 800);
+    fileInput.value = '';
+    setTimeout(loadList, 1500);
+  }
+
+  drop.addEventListener('click', () => fileInput.click());
+  drop.addEventListener('keydown', (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); fileInput.click(); } });
+  fileInput.addEventListener('change', () => handleFiles(fileInput.files));
+  ['dragenter', 'dragover'].forEach(ev => drop.addEventListener(ev, e => { e.preventDefault(); drop.classList.add('over'); }));
+  ['dragleave', 'drop'].forEach(ev => drop.addEventListener(ev, e => { e.preventDefault(); drop.classList.remove('over'); }));
+  drop.addEventListener('drop', e => handleFiles(e.dataTransfer.files));
+  document.getElementById('vault-refresh').addEventListener('click', loadList);
+  loadList();
 }
 
 function renderToolRuptureReview(content) {
@@ -1381,13 +1694,13 @@ python3 build_review.py</pre>
 function attachCopySummary(parentEl) {
   parentEl.querySelectorAll('.copy-summary-btn').forEach(btn => {
     btn.addEventListener('click', () => {
-      const text = btn.getAttribute('data-text').replace(/&amp;/g,'&').replace(/&lt;/g,'<').replace(/&gt;/g,'>').replace(/&quot;/g,'"').replace(/&#39;/g,"'");
+      const text = btn.getAttribute('data-text');
       navigator.clipboard.writeText(text).then(() => {
         const orig = btn.textContent;
         btn.classList.add('copied');
         btn.textContent = 'הועתק';
         setTimeout(() => { btn.classList.remove('copied'); btn.textContent = orig; }, 1500);
-      });
+      }).catch(() => alert('ההעתקה נכשלה. סמן את הטקסט והעתק ידנית.'));
     });
   });
 }
@@ -1442,7 +1755,7 @@ function initApp() {
   // Compose: merge selected topics into one letter
   function composeLetter() {
     if (selected.size === 0) return '';
-    const ordered = TOPICS.filter(t => selected.has(t.id) && t.type !== 'calculator' && t.type !== 'tool');
+    const ordered = [...selected].map(id => TOPICS.find(t => t.id === id)).filter(t => t && t.type !== 'calculator' && t.type !== 'tool');
     if (ordered.length === 0) return '';
     const parts = [];
     let recCounter = 0;
@@ -1518,14 +1831,14 @@ function initApp() {
       content.innerHTML = '<div class="welcome"><h2>לא נבחרו נושאים</h2><p>סמן נושאים בתיבות הסימון בסיידבר</p></div>';
       return;
     }
-    const count = [...selected].filter(id => {
-      const t = TOPICS.find(x => x.id === id);
-      return t && t.type !== 'calculator' && t.type !== 'tool';
-    }).length;
+    const orderedTopics = [...selected].map(id => TOPICS.find(t => t.id === id)).filter(t => t && t.type !== 'calculator' && t.type !== 'tool');
+    const count = orderedTopics.length;
+    const chips = orderedTopics.map(t => `<span class="chip">${escapeHtml(t.title)}<button type="button" data-id="${escapeHtml(t.id)}" aria-label="הסר ${escapeHtml(t.title)} מהמכתב" title="הסר מהמכתב">✕</button></span>`).join('');
     content.innerHTML = `
       <div id="compose-view">
         <h2>מכתב סיכום מורכב</h2>
-        <div class="compose-meta">מאוחד מ-${count} נושאים. אזהרות מאוחדות, המלצות ממוספרות 1-${0 /* will be computed */}, חתימה אחת.</div>
+        <div class="compose-meta">${count === 1 ? 'נושא אחד.' : `מאוחד מ-${count} נושאים לפי סדר הסימון.`} ההמלצות ממוספרות ברצף, ההמלצות הכלליות מופיעות פעם אחת, האזהרות מאוחדות ללא כפילויות, ובסוף חתימה אחת.</div>
+        <div class="compose-chips" id="compose-chips">${chips}</div>
         <div class="compose-actions">
           <button class="copy-all-btn" id="compose-copy-btn">📋 העתק מכתב מלא</button>
           <button class="copy-all-btn" id="compose-print-btn" style="background: var(--text-muted);">🖨️ הדפסה</button>
@@ -1535,6 +1848,11 @@ function initApp() {
       </div>
     `;
     document.getElementById('compose-copy-btn').addEventListener('click', (e) => copyText(text, e.currentTarget));
+    document.querySelectorAll('#compose-chips button').forEach(b => b.addEventListener('click', () => {
+      toggleSelection(b.dataset.id, false);
+      renderList(search.value);
+      showComposeView();
+    }));
     document.getElementById('compose-print-btn').addEventListener('click', () => window.print());
     document.getElementById('compose-back-btn').addEventListener('click', () => {
       location.hash = '';
@@ -1599,6 +1917,7 @@ function initApp() {
         const cb = document.createElement('input');
         cb.type = 'checkbox';
         cb.className = 'topic-cb';
+        cb.setAttribute('aria-label', 'צירוף הנושא ' + t.title + ' למכתב מאוחד');
         cb.checked = selected.has(t.id);
         cb.addEventListener('click', (e) => {
           e.stopPropagation();
@@ -1684,13 +2003,15 @@ function initApp() {
       ta.style.opacity = '0';
       document.body.appendChild(ta);
       ta.select();
-      try { document.execCommand('copy'); } catch (e) {}
+      let ok = false;
+      try { ok = document.execCommand('copy'); } catch (e) {}
       document.body.removeChild(ta);
-      showFeedback();
+      if (ok) showFeedback(); else alert('ההעתקה נכשלה. סמן את הטקסט והעתק ידנית (Ctrl+C).');
     });
   }
 
   function renderTopic(id) {
+    if (id === 'compose') { showComposeView(); return; }
     const topic = TOPICS.find(t => t.id === id);
     if (!topic) {
       content.innerHTML = '<div class="welcome"><h2>בחר נושא מהתפריט</h2><p>או חפש בתיבה למעלה</p></div>';
@@ -1717,6 +2038,7 @@ function initApp() {
     // Tool topics: render with dedicated tool UI (download page)
     if (topic.type === 'tool') {
       if (topic.tool === 'rupture_review') renderToolRuptureReview(content);
+      else if (topic.tool === 'pdf_vault') renderPdfVault(content);
       if (window.innerWidth <= 768) {
         sidebar.classList.remove('open');
         overlay.classList.remove('show');
@@ -1885,7 +2207,7 @@ function initApp() {
 
   // Compose-bar handlers
   document.querySelector('#compose-bar .btn-compose').addEventListener('click', () => {
-    showComposeView();
+    if (location.hash === '#compose') showComposeView(); else location.hash = '#compose';
     if (window.innerWidth <= 768) {
       sidebar.classList.remove('open');
       overlay.classList.remove('show');
