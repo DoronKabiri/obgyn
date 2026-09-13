@@ -2,7 +2,7 @@
  Cloudflare Worker: token-free upload/delete for the PDF vault.
  The worker holds the GitHub token; the page authenticates with the site password.
  Secrets (wrangler secret put): GITHUB_TOKEN, VAULT_PASSWORD
- Vars: OWNER=DoronKabiri, REPO=obgyn, DIR=docs, ALLOW_ORIGIN=https://doronkabiri.github.io
+ Vars: OWNER=DoronKabiri, REPO=obgyn, DIR=docs, ALLOW_ORIGIN=https://doronkabiri.com
 */
 export default {
   async fetch(req, env) {

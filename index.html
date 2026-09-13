@@ -1387,7 +1387,7 @@ function renderCalculatorMicrocephaly(content) {
 /* ===== PDF vault: client-side AES-256-GCM, files stored in repo docs/ via GitHub API ===== */
 const VAULT_OWNER = 'DoronKabiri', VAULT_REPO = 'obgyn', VAULT_DIR = 'docs';
 // Optional: URL of the upload service (tools/vault-worker). When set, upload and delete work with the site password only, no personal token.
-const VAULT_ENDPOINT = '';
+const VAULT_ENDPOINT = 'https://obgyn-vault.doronkabiri.workers.dev';
 const VAULT_TOKEN_KEY = 'obgyn-gh-token';
 
 async function vaultDeriveKey(password, salt, usages) {

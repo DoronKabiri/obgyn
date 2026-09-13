@@ -1,0 +1,10 @@
+name = "obgyn-vault"
+main = "worker.js"
+compatibility_date = "2026-01-01"
+
+[vars]
+OWNER = "DoronKabiri"
+REPO = "obgyn"
+DIR = "docs"
+ALLOW_ORIGIN = "https://doronkabiri.com"
+# secrets (never in this file): GITHUB_TOKEN, VAULT_PASSWORD  ->  wrangler secret put <NAME>
