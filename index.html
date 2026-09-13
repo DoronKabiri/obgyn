@@ -1439,6 +1439,7 @@ function renderPdfVault(content) {
       <h3>העלאת מסמך</h3>
       <div class="vault-drop" id="vault-drop" role="button" tabindex="0" aria-label="בחירת קובץ PDF להעלאה">
         <strong>גרור לכאן קובץ PDF, או לחץ לבחירה</strong>
+        <span>לפני ההעלאה תתבקש לתת לקובץ שם ניטרלי (ברירת המחדל: מסמך ותאריך).</span>
         <span>תוכן הקובץ מוצפן במחשב שלך, אך שם הקובץ נשמר כפי שהוא וגלוי באינטרנט. אין לכלול בשם הקובץ שם מטופלת, מספר זהות או מספר מקרה.</span>
         <input type="file" id="vault-file" accept="application/pdf,.pdf" multiple>
       </div>
@@ -1556,6 +1557,23 @@ function renderPdfVault(content) {
     } catch (e) { alert('מחיקה נכשלה: ' + e.message); }
   }
 
+  function vaultSanitizeName(raw) {
+    let n = String(raw || '').trim().split(/[\\/]/).pop();
+    n = n.replace(/\.pdf$/i, '');
+    n = n.replace(/[^\w.\- ()\u0590-\u05FF]+/g, '-').replace(/-{2,}/g, '-').replace(/^[-. ]+|[-. ]+$/g, '').slice(0, 80);
+    return n ? n + '.pdf' : '';
+  }
+  function vaultAskName(i, total) {
+    const d = new Date(), p = (x) => String(x).padStart(2, '0');
+    const def = `מסמך-${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}-${p(d.getHours())}${p(d.getMinutes())}` + (total > 1 ? `-${i + 1}` : '') + '.pdf';
+    for (;;) {
+      const ans = prompt('שם לקובץ בכספת. שם הקובץ גלוי באינטרנט: בלי שם מטופלת, מספר זהות או מספר מקרה.', def);
+      if (ans === null) return null;
+      const clean = vaultSanitizeName(ans);
+      if (clean) return clean;
+      alert('השם ריק או לא תקין. אפשר להשתמש באותיות, ספרות, רווח, מקף ונקודה.');
+    }
+  }
   async function handleFiles(files) {
     if (!pw) { setStatus(upStatus, 'סיסמת האתר אינה זמינה בסשן זה. התנתק והתחבר מחדש.', 'err'); return; }
     const list = Array.from(files).filter(f => /\.pdf$/i.test(f.name) || f.type === 'application/pdf');
@@ -1568,23 +1586,25 @@ function renderPdfVault(content) {
       const f = list[i];
       progBar.style.width = Math.round((i / list.length) * 100) + '%';
       if (f.size > 24 * 1024 * 1024) { setStatus(upStatus, `${f.name}: גדול מ-24 מגה-בייט ולכן לא הועלה.`, 'err'); alert(`${f.name} גדול מ-24 מגה-בייט ולכן לא הועלה. שאר הקבצים ימשיכו כרגיל.`); continue; }
-      setStatus(upStatus, `מצפין ${f.name}...`);
+      const shown = vaultAskName(i, list.length);
+      if (!shown) { setStatus(upStatus, `${f.name}: ההעלאה בוטלה.`); continue; }
+      setStatus(upStatus, `מצפין ${shown}...`);
       const enc = await vaultEncrypt(new Uint8Array(await f.arrayBuffer()), pw);
-      const encName = f.name + '.enc';
+      const encName = shown + '.enc';
       if (VAULT_ENDPOINT) {
-        setStatus(upStatus, `מעלה ${f.name}...`);
+        setStatus(upStatus, `מעלה ${shown}...`);
         try {
           const send = (overwrite) => fetch(VAULT_ENDPOINT, { method: 'POST', headers: { 'Authorization': 'Bearer ' + pw, 'Content-Type': 'application/json' }, body: JSON.stringify({ name: encName, content: bytesToB64(enc), overwrite }) });
           let r = await send(false);
           if (r.status === 409) {
-            if (!confirm(`בכספת כבר קיים מסמך בשם "${f.name}". להחליף אותו? המסמך הקודם יימחק.`)) { setStatus(upStatus, `${f.name}: לא הועלה, קיים מסמך באותו שם.`, 'err'); continue; }
+            if (!confirm(`בכספת כבר קיים מסמך בשם "${shown}". להחליף אותו? המסמך הקודם יימחק.`)) { setStatus(upStatus, `${shown}: לא הועלה, קיים מסמך באותו שם.`, 'err'); continue; }
             r = await send(true);
           }
           if (!r.ok) throw new Error('service ' + r.status);
-          setStatus(upStatus, `${f.name} הועלה בהצלחה. הופעתו ברשימה עשויה להתעכב עד כדקה.`, 'ok');
+          setStatus(upStatus, `${shown} הועלה בהצלחה. הופעתו ברשימה עשויה להתעכב עד כדקה.`, 'ok');
         } catch (e) {
           const hint = /401/.test(e.message) ? 'סיסמת האתר אינה תואמת את שירות ההעלאה.' : 'בדוק את חיבור האינטרנט ונסה שוב.';
-          setStatus(upStatus, `${f.name}: ההעלאה נכשלה. ${hint}`, 'err'); alert(`${f.name}: ההעלאה נכשלה. ${hint}`);
+          setStatus(upStatus, `${shown}: ההעלאה נכשלה. ${hint}`, 'err'); alert(`${shown}: ההעלאה נכשלה. ${hint}`);
         }
         continue;
       }
@@ -1596,14 +1616,14 @@ function renderPdfVault(content) {
         setStatus(upStatus, `${encName} נשמר בתיקיית ההורדות במחשב זה (מוצפן), אך עדיין אינו בכספת ולא יופיע ברשימה. להעלאה ישירה מהדפדפן יש להגדיר טוקן פעם אחת (ההסבר נפתח למעלה), או להעלות את הקובץ ידנית לתיקיית docs באתר GitHub.`);
         continue;
       }
-      setStatus(upStatus, `מעלה ${f.name} ל-GitHub...`);
+      setStatus(upStatus, `מעלה ${shown} ל-GitHub...`);
       try {
         // Check existing (to get sha for overwrite)
         let sha;
         const chk = await fetch(apiBase + '/' + encodeURIComponent(encName) + '?ref=main&t=' + Date.now(), { headers: ghHeaders(token), cache: 'no-store' });
         if (chk.ok) {
           sha = (await chk.json()).sha;
-          if (!confirm(`בכספת כבר קיים מסמך בשם "${f.name}". להחליף אותו? המסמך הקודם יימחק.`)) { setStatus(upStatus, `${f.name}: לא הועלה, קיים מסמך באותו שם.`, 'err'); continue; }
+          if (!confirm(`בכספת כבר קיים מסמך בשם "${shown}". להחליף אותו? המסמך הקודם יימחק.`)) { setStatus(upStatus, `${shown}: לא הועלה, קיים מסמך באותו שם.`, 'err'); continue; }
         }
         const body = { message: 'Add ' + encName, content: bytesToB64(enc), branch: 'main' };
         if (sha) body.sha = sha;
@@ -1611,11 +1631,11 @@ function renderPdfVault(content) {
           method: 'PUT', headers: { ...ghHeaders(token), 'Content-Type': 'application/json' }, body: JSON.stringify(body),
         });
         if (!r.ok) { const t = await r.text(); throw new Error('GitHub ' + r.status + ' ' + t.slice(0, 120)); }
-        setStatus(upStatus, `${f.name} הועלה בהצלחה. הופעתו ברשימה עשויה להתעכב עד כדקה.`, 'ok');
+        setStatus(upStatus, `${shown} הועלה בהצלחה. הופעתו ברשימה עשויה להתעכב עד כדקה.`, 'ok');
       } catch (e) {
         const hint = /401/.test(e.message) ? 'הטוקן שגוי או שפג תוקפו. יש להזין טוקן חדש בהגדרה שלמעלה.' : /403/.test(e.message) ? 'לטוקן אין הרשאת כתיבה לרפו, או שחרגת ממגבלת הפניות של GitHub.' : /404/.test(e.message) ? 'הרפו לא נמצא או שלטוקן אין גישה אליו.' : 'בדוק את חיבור האינטרנט ונסה שוב.';
-        setStatus(upStatus, `${f.name}: ההעלאה נכשלה. ${hint}`, 'err');
-        alert(`${f.name}: ההעלאה נכשלה. ${hint}`);
+        setStatus(upStatus, `${shown}: ההעלאה נכשלה. ${hint}`, 'err');
+        alert(`${shown}: ההעלאה נכשלה. ${hint}`);
       }
     }
     progBar.style.width = '100%';
