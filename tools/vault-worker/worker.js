@@ -1,5 +1,5 @@
 /*
- Cloudflare Worker: token-free upload/delete for the PDF vault.
+ Cloudflare Worker: token-free upload/delete for the file vault (any file type, stored as <name>.enc).
  The worker holds the GitHub token; the page authenticates with the site password.
  Secrets (wrangler secret put): GITHUB_TOKEN, VAULT_PASSWORD
  Vars: OWNER=DoronKabiri, REPO=obgyn, DIR=docs, ALLOW_ORIGIN=https://doronkabiri.com
@@ -18,7 +18,7 @@ export default {
     let body;
     try { body = await req.json(); } catch { return json({ error: 'bad json' }, 400, cors); }
     const name = String(body.name || '');
-    if (!/^[\w.\- ()֐-׿]+\.pdf\.enc$/.test(name)) return json({ error: 'bad name' }, 400, cors);
+    if (!/^[\w.\- ()֐-׿]+\.enc$/.test(name) || /^[.\- ]/.test(name) || /\.\./.test(name) || name.length > 120) return json({ error: 'bad name' }, 400, cors);
     const api = `https://api.github.com/repos/${env.OWNER}/${env.REPO}/contents/${env.DIR}/${encodeURIComponent(name)}`;
     const gh = { 'Authorization': 'Bearer ' + env.GITHUB_TOKEN, 'Accept': 'application/vnd.github+json', 'User-Agent': 'obgyn-vault-worker', 'Content-Type': 'application/json' };
     // existing sha (for overwrite / delete)
@@ -30,7 +30,7 @@ export default {
       const r = await fetch(api, { method: 'DELETE', headers: gh, body: JSON.stringify({ message: 'Delete ' + name, sha, branch: 'main' }) });
       return json({ ok: r.ok, status: r.status }, r.ok ? 200 : 502, cors);
     }
-    if (typeof body.content !== 'string' || body.content.length > 34 * 1024 * 1024) return json({ error: 'bad content' }, 400, cors);
+    if (typeof body.content !== 'string' || body.content.length > 22 * 1024 * 1024) return json({ error: 'bad content' }, 400, cors);
     if (sha && !body.overwrite) return json({ error: 'exists' }, 409, cors);
     const put = { message: 'Add ' + name, content: body.content, branch: 'main' };
     if (sha) put.sha = sha;

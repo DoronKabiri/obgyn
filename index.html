@@ -441,7 +441,7 @@
   .calc-result .copy-summary-btn:hover { background: var(--primary); color: white; }
   .calc-result .copy-summary-btn.copied { background: var(--success); color: white; border-color: var(--success); }
   .calc-result .copy-summary-btn.copied::before { content: "✓ "; }
-  /* ===== PDF vault ===== */
+  /* ===== file vault ===== */
   .vault-drop {
     border: 2px dashed var(--primary-light);
     border-radius: 12px;
@@ -634,7 +634,7 @@
   <button class="btn-clear">נקה</button>
 </div>
 
-<script src="topics.enc.js?v=21"></script>
+<script src="topics.enc.js?v=22"></script>
 <script>
 /* ===== Login & decryption ===== */
 async function decryptTopics(encryptedB64, password, iterations) {
@@ -1384,7 +1384,7 @@ function renderCalculatorMicrocephaly(content) {
   });
 }
 
-/* ===== PDF vault: client-side AES-256-GCM, files stored in repo docs/ via GitHub API ===== */
+/* ===== file vault (any file type): client-side AES-256-GCM, files stored in repo docs/ via GitHub API ===== */
 const VAULT_OWNER = 'DoronKabiri', VAULT_REPO = 'obgyn', VAULT_DIR = 'docs';
 // Optional: URL of the upload service (tools/vault-worker). When set, upload and delete work with the site password only, no personal token.
 const VAULT_ENDPOINT = 'https://obgyn-vault.doronkabiri.workers.dev';
@@ -1423,7 +1423,7 @@ function ghHeaders(token) {
 function renderPdfVault(content) {
   const pw = sessionStorage.getItem('obgyn-pw') || '';
   content.innerHTML = `
-    <h2>מסמכי PDF</h2>
+    <h2>מסמכים (כספת מוצפנת)</h2>
     <div class="topic-meta">כספת מסמכים. כל קובץ מוצפן בדפדפן בסיסמת האתר לפני שהוא נשמר, ומפוענח רק בהורדה. שים לב: הפענוח דורש את הסיסמה שבה הקובץ הוצפן, לכן אם סיסמת האתר תוחלף יש להוריד את המסמכים לפני ההחלפה ולהעלותם מחדש.</div>
 
     <div class="calc-card">
@@ -1437,11 +1437,12 @@ function renderPdfVault(content) {
       <summary>העלאת מסמך (למי שמנהל את האתר)</summary>
     <div class="calc-card">
       <h3>העלאת מסמך</h3>
-      <div class="vault-drop" id="vault-drop" role="button" tabindex="0" aria-label="בחירת קובץ PDF להעלאה">
-        <strong>גרור לכאן קובץ PDF, או לחץ לבחירה</strong>
+      <div class="vault-drop" id="vault-drop" role="button" tabindex="0" aria-label="בחירת קבצים להעלאה">
+        <strong>גרור לכאן קבצים, או לחץ לבחירה</strong>
+        <span>כל סוג קובץ (מסמך, גיליון, מצגת, תמונה וכיו״ב) עד 15 מגה-בייט לקובץ.</span>
         <span>לפני ההעלאה תתבקש לתת לקובץ שם ניטרלי (ברירת המחדל: מסמך ותאריך).</span>
-        <span>תוכן הקובץ מוצפן במחשב שלך, אך שם הקובץ נשמר כפי שהוא וגלוי באינטרנט. אין לכלול בשם הקובץ שם מטופלת, מספר זהות או מספר מקרה.</span>
-        <input type="file" id="vault-file" accept="application/pdf,.pdf" multiple>
+        <span>תוכן הקובץ מוצפן במחשב שלך, אך שם הקובץ אינו מוצפן וגלוי באינטרנט. אין לכלול בשם הקובץ שם מטופלת, מספר זהות או מספר מקרה.</span>
+        <input type="file" id="vault-file" multiple>
       </div>
       <div class="vault-progress" id="vault-progress"><div></div></div>
       <div class="vault-status" id="vault-up-status"></div>
@@ -1511,7 +1512,7 @@ function renderPdfVault(content) {
       items.forEach(it => {
         const li = document.createElement('li');
         const display = it.name.replace(/\.enc$/, '');
-        li.innerHTML = `<span class="vname">📄 ${escapeHtml(display)}</span><span class="vsize">${fmtSize(it.size)}</span><button class="vdl">הורד</button><button class="vdel" title="מחיקה מהאתר">מחק</button>`;
+        li.innerHTML = `<span class="vname">📎 ${escapeHtml(display)}</span><span class="vsize">${fmtSize(it.size)}</span><button class="vdl">הורד</button><button class="vdel" title="מחיקה מהאתר">מחק</button>`;
         li.querySelector('.vdl').addEventListener('click', (e) => downloadItem(it, display, e.currentTarget));
         li.querySelector('.vdel').addEventListener('click', () => deleteItem(it, display));
         listEl.appendChild(li);
@@ -1530,13 +1531,13 @@ function renderPdfVault(content) {
       if (!r.ok) throw new Error('הורדה נכשלה ' + r.status);
       const enc = new Uint8Array(await r.arrayBuffer());
       const plain = await vaultDecrypt(enc, pw);
-      const blob = new Blob([plain], { type: 'application/pdf' });
+      const blob = new Blob([plain], { type: vaultMime(display) });
       const a = document.createElement('a');
       a.href = URL.createObjectURL(blob); a.download = display; document.body.appendChild(a); a.click();
       setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 2000);
       btn.textContent = 'הורד ✓';
     } catch (e) {
-      alert('לא ניתן לפתוח את המסמך. הקובץ הוצפן בסיסמת אתר אחרת, או שההורדה נקטעה. נסה שוב, ואם התקלה חוזרת פנה למי שהעלה את הקובץ.');
+      alert('לא ניתן לפתוח את הקובץ. הקובץ הוצפן בסיסמת אתר אחרת, או שההורדה נקטעה. נסה שוב, ואם התקלה חוזרת פנה למי שהעלה את הקובץ.');
       btn.textContent = orig;
     } finally { btn.disabled = false; setTimeout(() => { btn.textContent = orig; }, 2000); }
   }
@@ -1557,36 +1558,38 @@ function renderPdfVault(content) {
     } catch (e) { alert('מחיקה נכשלה: ' + e.message); }
   }
 
-  function vaultSanitizeName(raw) {
+  const VAULT_MIME = { pdf: 'application/pdf', docx: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document', doc: 'application/msword', xlsx: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', xls: 'application/vnd.ms-excel', pptx: 'application/vnd.openxmlformats-officedocument.presentationml.presentation', jpg: 'image/jpeg', jpeg: 'image/jpeg', png: 'image/png', gif: 'image/gif', heic: 'image/heic', txt: 'text/plain', csv: 'text/csv', zip: 'application/zip', mp4: 'video/mp4', mp3: 'audio/mpeg' };
+  function vaultExt(name) { const m = /\.([A-Za-z0-9]{1,8})$/.exec(String(name || '')); return m ? '.' + m[1].toLowerCase() : ''; }
+  function vaultMime(name) { return VAULT_MIME[vaultExt(name).slice(1)] || 'application/octet-stream'; }
+  function vaultSanitizeName(raw, ext) {
+    // ext: the original file's extension (e.g. ".docx"); it is always kept so the file opens correctly after download
     let n = String(raw || '').trim().split(/[\\/]/).pop();
-    n = n.replace(/\.pdf$/i, '');
-    n = n.replace(/[^\w.\- ()\u0590-\u05FF]+/g, '-').replace(/-{2,}/g, '-').replace(/^[-. ]+|[-. ]+$/g, '').slice(0, 80);
-    return n ? n + '.pdf' : '';
+    if (ext && n.toLowerCase().endsWith(ext)) n = n.slice(0, -ext.length);
+    n = n.replace(/[^\w.\- ()\u0590-\u05FF]+/g, '-').replace(/-{2,}/g, '-').replace(/\.{2,}/g, '.').slice(0, 80).replace(/^[-. ]+|[-. ]+$/g, '');
+    return n ? n + ext : '';
   }
-  function vaultAskName(i, total) {
+  function vaultAskName(i, total, ext) {
     const d = new Date(), p = (x) => String(x).padStart(2, '0');
-    const def = `מסמך-${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}-${p(d.getHours())}${p(d.getMinutes())}` + (total > 1 ? `-${i + 1}` : '') + '.pdf';
+    const def = `מסמך-${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}-${p(d.getHours())}${p(d.getMinutes())}` + (total > 1 ? `-${i + 1}` : '') + ext;
     for (;;) {
-      const ans = prompt('שם לקובץ בכספת. שם הקובץ גלוי באינטרנט: בלי שם מטופלת, מספר זהות או מספר מקרה.', def);
+      const ans = prompt('שם לקובץ בכספת. הסיומת נשמרת אוטומטית, אין צורך להקליד אותה. שם הקובץ גלוי באינטרנט: בלי שם מטופלת, מספר זהות או מספר מקרה.', def);
       if (ans === null) return null;
-      const clean = vaultSanitizeName(ans);
+      const clean = vaultSanitizeName(ans, ext);
       if (clean) return clean;
       alert('השם ריק או לא תקין. אפשר להשתמש באותיות, ספרות, רווח, מקף ונקודה.');
     }
   }
   async function handleFiles(files) {
     if (!pw) { setStatus(upStatus, 'סיסמת האתר אינה זמינה בסשן זה. התנתק והתחבר מחדש.', 'err'); return; }
-    const list = Array.from(files).filter(f => /\.pdf$/i.test(f.name) || f.type === 'application/pdf');
-    if (!list.length) { setStatus(upStatus, 'ניתן להעלות קבצי PDF בלבד. הקובץ שנבחר אינו PDF.', 'err'); return; }
-    const skipped = Array.from(files).length - list.length;
-    if (skipped > 0) alert(`${skipped} קבצים שאינם PDF לא יועלו. רק קבצי PDF נתמכים.`);
+    const list = Array.from(files);
+    if (!list.length) { setStatus(upStatus, 'לא נבחר קובץ.', 'err'); return; }
     const token = getToken();
     prog.style.display = 'block';
     for (let i = 0; i < list.length; i++) {
       const f = list[i];
       progBar.style.width = Math.round((i / list.length) * 100) + '%';
-      if (f.size > 24 * 1024 * 1024) { setStatus(upStatus, `${f.name}: גדול מ-24 מגה-בייט ולכן לא הועלה.`, 'err'); alert(`${f.name} גדול מ-24 מגה-בייט ולכן לא הועלה. שאר הקבצים ימשיכו כרגיל.`); continue; }
-      const shown = vaultAskName(i, list.length);
+      if (f.size > 15 * 1024 * 1024) { setStatus(upStatus, `${f.name}: גדול מ-15 מגה-בייט ולכן לא הועלה.`, 'err'); alert(`${f.name} גדול מ-15 מגה-בייט ולכן לא הועלה. שאר הקבצים ימשיכו כרגיל.`); continue; }
+      const shown = vaultAskName(i, list.length, vaultExt(f.name));
       if (!shown) { setStatus(upStatus, `${f.name}: ההעלאה בוטלה.`); continue; }
       setStatus(upStatus, `מצפין ${shown}...`);
       const enc = await vaultEncrypt(new Uint8Array(await f.arrayBuffer()), pw);
@@ -1597,7 +1600,7 @@ function renderPdfVault(content) {
           const send = (overwrite) => fetch(VAULT_ENDPOINT, { method: 'POST', headers: { 'Authorization': 'Bearer ' + pw, 'Content-Type': 'application/json' }, body: JSON.stringify({ name: encName, content: bytesToB64(enc), overwrite }) });
           let r = await send(false);
           if (r.status === 409) {
-            if (!confirm(`בכספת כבר קיים מסמך בשם "${shown}". להחליף אותו? המסמך הקודם יימחק.`)) { setStatus(upStatus, `${shown}: לא הועלה, קיים מסמך באותו שם.`, 'err'); continue; }
+            if (!confirm(`בכספת כבר קיים קובץ בשם "${shown}". להחליף אותו? הקובץ הקודם יימחק.`)) { setStatus(upStatus, `${shown}: לא הועלה, קיים קובץ באותו שם.`, 'err'); continue; }
             r = await send(true);
           }
           if (!r.ok) throw new Error('service ' + r.status);
@@ -1623,7 +1626,7 @@ function renderPdfVault(content) {
         const chk = await fetch(apiBase + '/' + encodeURIComponent(encName) + '?ref=main&t=' + Date.now(), { headers: ghHeaders(token), cache: 'no-store' });
         if (chk.ok) {
           sha = (await chk.json()).sha;
-          if (!confirm(`בכספת כבר קיים מסמך בשם "${shown}". להחליף אותו? המסמך הקודם יימחק.`)) { setStatus(upStatus, `${shown}: לא הועלה, קיים מסמך באותו שם.`, 'err'); continue; }
+          if (!confirm(`בכספת כבר קיים קובץ בשם "${shown}". להחליף אותו? הקובץ הקודם יימחק.`)) { setStatus(upStatus, `${shown}: לא הועלה, קיים קובץ באותו שם.`, 'err'); continue; }
         }
         const body = { message: 'Add ' + encName, content: bytesToB64(enc), branch: 'main' };
         if (sha) body.sha = sha;
