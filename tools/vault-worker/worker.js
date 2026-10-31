@@ -1,5 +1,6 @@
 /*
- Cloudflare Worker: token-free upload/delete for the file vault (any file type, stored as <name>.enc).
+ Cloudflare Worker: token-free upload/delete for the file vault (any file type, stored as <name>.enc),
+ plus the encrypted notes/usage file (kind: 'note' -> notes/<name>.enc).
  The worker holds the GitHub token; the page authenticates with the site password.
  Secrets (wrangler secret put): GITHUB_TOKEN, VAULT_PASSWORD
  Vars: OWNER=DoronKabiri, REPO=obgyn, DIR=docs, ALLOW_ORIGIN=https://doronkabiri.com
@@ -19,7 +20,9 @@ export default {
     try { body = await req.json(); } catch { return json({ error: 'bad json' }, 400, cors); }
     const name = String(body.name || '');
     if (!/^[\w.\- ()֐-׿]+\.enc$/.test(name) || /^[.\- ]/.test(name) || /\.\./.test(name) || name.length > 120) return json({ error: 'bad name' }, 400, cors);
-    const api = `https://api.github.com/repos/${env.OWNER}/${env.REPO}/contents/${env.DIR}/${encodeURIComponent(name)}`;
+    // kind 'note': the site's private notes/usage file, kept outside the vault folder so the mailer ignores it
+    const dir = body.kind === 'note' ? 'notes' : env.DIR;
+    const api = `https://api.github.com/repos/${env.OWNER}/${env.REPO}/contents/${dir}/${encodeURIComponent(name)}`;
     const gh = { 'Authorization': 'Bearer ' + env.GITHUB_TOKEN, 'Accept': 'application/vnd.github+json', 'User-Agent': 'obgyn-vault-worker', 'Content-Type': 'application/json' };
     // existing sha (for overwrite / delete)
     let sha;

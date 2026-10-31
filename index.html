@@ -344,6 +344,10 @@
   }
   .signature div:first-child { margin-bottom: 2px; }
 
+  .notes-box { margin-top: 18px; border: 1px solid var(--border); border-radius: 8px; padding: 10px 14px; background: var(--bg-secondary, rgba(0,0,0,0.03)); }
+  .notes-box summary { cursor: pointer; font-weight: 600; color: var(--primary); font-size: 14px; }
+  .notes-box textarea { width: 100%; min-height: 72px; margin-top: 10px; padding: 10px 12px; border: 1px solid var(--border); border-radius: 6px; font: inherit; font-size: 14px; line-height: 1.6; background: var(--bg, #fff); color: var(--text); resize: vertical; }
+  .notes-status { display: flex; justify-content: space-between; gap: 12px; flex-wrap: wrap; margin-top: 6px; font-size: 12px; color: var(--text-muted); }
   .disclaimer {
     margin-top: 32px;
     padding: 16px 20px;
@@ -634,7 +638,7 @@
   <button class="btn-clear">נקה</button>
 </div>
 
-<script src="topics.enc.js?v=22"></script>
+<script src="topics.enc.js?v=23"></script>
 <script>
 /* ===== Login & decryption ===== */
 async function decryptTopics(encryptedB64, password, iterations) {
@@ -1752,6 +1756,93 @@ function initApp() {
     localStorage.setItem(MRU_KEY, JSON.stringify(cur.slice(0, 6)));
   }
 
+  // Notes and usage: per-topic free-text notes plus view/copy counters, saved locally and synced
+  // (encrypted with the site password) to notes/notes.json.enc in the repo through the upload service.
+  const NOTES_KEY = 'obgyn-notes-v1', DEV_KEY = 'obgyn-device';
+  let devId = localStorage.getItem(DEV_KEY);
+  if (!devId) { devId = Math.random().toString(36).slice(2, 10); localStorage.setItem(DEV_KEY, devId); }
+  let notesData = { notes: {}, devices: {}, updatedAt: 0 };
+  try { notesData = Object.assign(notesData, JSON.parse(localStorage.getItem(NOTES_KEY) || '{}')); } catch {}
+  notesData.notes = notesData.notes || {}; notesData.devices = notesData.devices || {};
+  let notesDirty = false, usageDirty = false, lastPush = 0, pushTimer = null;
+  const myDev = () => notesData.devices[devId] || (notesData.devices[devId] = { views: {}, copies: {}, lastSeen: 0 });
+  const saveNotesLocal = () => { try { localStorage.setItem(NOTES_KEY, JSON.stringify(notesData)); } catch {} };
+  const notesPw = () => sessionStorage.getItem('obgyn-pw') || '';
+  function bumpUsage(kind, id) {
+    if (!id) return;
+    const d = myDev(); d[kind][id] = (d[kind][id] || 0) + 1; d.lastSeen = Date.now();
+    usageDirty = true; saveNotesLocal(); refreshNotesStatus();
+  }
+  function mergeNotes(remote) {
+    for (const [id, n] of Object.entries(remote.notes || {})) {
+      const l = notesData.notes[id];
+      if (!l || (n.updatedAt || 0) > (l.updatedAt || 0)) notesData.notes[id] = n;
+    }
+    for (const [dev, d] of Object.entries(remote.devices || {})) {
+      if (dev !== devId) { notesData.devices[dev] = d; continue; }
+      const mine = myDev();
+      for (const k of ['views', 'copies']) for (const [t, v] of Object.entries(d[k] || {})) mine[k][t] = Math.max(mine[k][t] || 0, v);
+    }
+  }
+  async function notesPull() {
+    const pw = notesPw(); if (!pw) return false;
+    try {
+      const r = await fetch(`https://raw.githubusercontent.com/${VAULT_OWNER}/${VAULT_REPO}/main/notes/notes.json.enc?t=${Date.now()}`, { cache: 'no-store' });
+      if (!r.ok) return r.status === 404;
+      const plain = await vaultDecrypt(new Uint8Array(await r.arrayBuffer()), pw);
+      mergeNotes(JSON.parse(new TextDecoder().decode(plain)));
+      saveNotesLocal(); return true;
+    } catch (e) { return false; }
+  }
+  async function notesPush() {
+    const pw = notesPw(); if (!pw || !VAULT_ENDPOINT) return false;
+    try {
+      await notesPull();
+      notesData.updatedAt = Date.now();
+      const enc = await vaultEncrypt(new TextEncoder().encode(JSON.stringify(notesData)), pw);
+      const r = await fetch(VAULT_ENDPOINT, { method: 'POST', headers: { 'Authorization': 'Bearer ' + pw, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ kind: 'note', name: 'notes.json.enc', content: bytesToB64(enc), overwrite: true }) });
+      if (!r.ok) return false;
+      lastPush = Date.now(); notesDirty = false; usageDirty = false; saveNotesLocal(); return true;
+    } catch (e) { return false; }
+  }
+  function schedulePush(delayMs) {
+    clearTimeout(pushTimer);
+    pushTimer = setTimeout(async () => {
+      const ok = await notesPush();
+      if (ok) refreshNotesStatus('סונכרן');
+      else { refreshNotesStatus('נשמר במחשב זה, הסנכרון יושלם בהמשך'); if (delayMs < 10 * 60 * 1000) schedulePush(Math.min(delayMs * 4, 10 * 60 * 1000)); }
+    }, delayMs);
+  }
+  function refreshNotesStatus(msg) {
+    const el = document.getElementById('note-status'); if (!el) return;
+    const id = (location.hash || '').slice(1), d = myDev();
+    const usage = document.getElementById('note-usage');
+    if (usage) usage.textContent = `נצפה ${d.views[id] || 0} פעמים, הועתק ${d.copies[id] || 0} פעמים במחשב זה`;
+    if (msg) { el.textContent = msg; return; }
+    el.textContent = !notesPw() || !VAULT_ENDPOINT ? 'נשמר במחשב זה בלבד' : notesDirty ? 'נשמר במחשב זה, מסתנכרן...' : 'נשמר';
+  }
+  function notesBoxHtml(id) {
+    const n = notesData.notes[id]; const has = !!(n && (n.text || '').trim());
+    return `<details class="notes-box" id="notes-box"${has ? ' open' : ''}>
+      <summary>הערות שלי לדף הזה${has ? ' ●' : ''}</summary>
+      <textarea id="topic-note" placeholder="מה לשנות בדף הזה: ניסוח, פריט חסר או מיותר, סדר. נשמר אוטומטית ומגיע לשדרוג הבא.">${escapeHtml(has ? n.text : '')}</textarea>
+      <div class="notes-status"><span id="note-status"></span><span id="note-usage"></span></div>
+    </details>`;
+  }
+  function wireNotesBox(id) {
+    const ta = document.getElementById('topic-note'); if (!ta) return;
+    ta.addEventListener('input', () => {
+      notesData.notes[id] = { text: ta.value, updatedAt: Date.now() };
+      notesDirty = true; saveNotesLocal(); refreshNotesStatus(); schedulePush(3000);
+    });
+    refreshNotesStatus();
+  }
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'hidden' && (notesDirty || (usageDirty && Date.now() - lastPush > 10 * 60 * 1000))) notesPush();
+  });
+  notesPull().then(() => { const id = (location.hash || '').slice(1); const ta = document.getElementById('topic-note'); if (ta && !ta.value && notesData.notes[id]) { ta.value = notesData.notes[id].text || ''; document.getElementById('notes-box').open = true; } refreshNotesStatus(); });
+
   // Selection state for compose
   const SEL_KEY = 'obgyn-compose-sel';
   let selected = new Set();
@@ -2154,10 +2245,14 @@ function initApp() {
       <div class="disclaimer">
         הטקסטים נכתבו לשימוש כקטעים במכתבי סיכום ביקור. התאם בכל מקרה למצבה הספציפי של המטופלת.
       </div>
+
+      ${notesBoxHtml(topic.id)}
     `;
+    wireNotesBox(topic.id);
 
     content.querySelectorAll('button.copy-btn').forEach(btn => {
       btn.addEventListener('click', () => {
+        bumpUsage('copies', topic.id);
         const which = btn.dataset.block;
         let text = '';
         if (which === 'template') text = topic.template;
@@ -2172,7 +2267,7 @@ function initApp() {
       });
     });
     content.querySelectorAll('button.copy-all-btn').forEach(btn => {
-      btn.addEventListener('click', () => copyText(buildBlockText(topic), btn));
+      btn.addEventListener('click', () => { bumpUsage('copies', topic.id); copyText(buildBlockText(topic), btn); });
     });
 
     if (window.innerWidth <= 768) {
@@ -2191,6 +2286,7 @@ function initApp() {
     const t = TOPICS.find(x => x.id === id);
     if (t && t.type !== 'calculator' && t.type !== 'tool') {
       pushMRU(id);
+      bumpUsage('views', id);
       if (!search.value) renderList('');
     }
   }
