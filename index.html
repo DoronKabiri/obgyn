@@ -359,18 +359,6 @@
   #visit-bar .ms-panel table { border-collapse: collapse; font-size: 13px; width: 100%; }
   #visit-bar .ms-panel td { padding: 4px 6px; border-bottom: 1px dashed var(--border); }
   #visit-bar .ms-panel td:last-child { white-space: nowrap; color: var(--text-muted); }
-  /* fill-in fields inside text blocks */
-  .fill { font: inherit; font-size: inherit; line-height: 1.4; padding: 0 6px; margin: 0 1px; border: 1px solid #e3c25a; border-radius: 5px; background: rgba(250, 221, 104, 0.25); color: var(--text); min-width: 2.5em; max-width: 100%; }
-  .fill-print { display: none; }
-  .fill-opt { font: inherit; font-size: inherit; line-height: 1.4; padding: 0 6px; margin: 0 1px; border: 1px dashed #e3c25a; border-radius: 6px; background: rgba(250, 221, 104, 0.1); color: var(--text-muted); text-decoration: line-through; cursor: pointer; text-align: start; white-space: normal; }
-  .fill-opt.on { border-style: solid; background: rgba(250, 221, 104, 0.25); color: var(--text); text-decoration: none; }
-  .fill-choice.fill-missing { outline: 1px solid #c0392b; border-radius: 999px; background: rgba(192, 57, 43, 0.12); }
-  @media (prefers-color-scheme: dark) { .fill-choice .chip.on { color: #0f172a; font-weight: 600; } }
-  .fill:focus { outline: 2px solid var(--primary); outline-offset: 1px; }
-  .fill.fill-missing { border-color: #c0392b; background: rgba(192, 57, 43, 0.12); }
-  .fill-choice { display: inline-flex; flex-wrap: wrap; gap: 4px; vertical-align: baseline; margin: 0 2px; }
-  .fill-choice .chip { font: inherit; font-size: 0.92em; line-height: 1.3; padding: 1px 9px; border-radius: 999px; border: 1px solid #e3c25a; background: rgba(250, 221, 104, 0.18); color: var(--text); cursor: pointer; }
-  .fill-choice .chip.on { background: var(--primary); border-color: var(--primary); color: #fff; }
   .copy-all-bar { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
   .bar-btn { font: inherit; font-size: 14px; padding: 8px 12px; border-radius: 8px; border: 1px solid var(--border); background: transparent; color: var(--text-muted); cursor: pointer; }
   .bar-btn:hover { color: var(--text); border-color: var(--primary); }
@@ -412,8 +400,6 @@
   @media print {
     :root { --primary: #1F4E79; --primary-light: #4472A8; --bg: #fff; --card-bg: #fff; --text: #1f2937; --text-muted: #6b7280; --border: #e5e7eb; --hover: #eef4fb; }
     #visit-bar, details.teach-box, .notes-box, .topic-hint, .bar-btn { display: none !important; }
-    .fill, .fill-choice, .fill-opt { display: none !important; }
-    .fill-print { display: inline; }
     .picto-wrap { break-inside: avoid; page-break-inside: avoid; }
     .picto i { background: #fff; border: 1.5px solid #444; }
     .picto i.on { background: #000; border-color: #000; }
@@ -703,7 +689,7 @@
   <label class="v-desk">משקל היום <input type="number" id="visit-w" autocomplete="off" min="30" max="250" step="0.5" placeholder="ק״ג"></label>
   <label class="v-desk">גובה <input type="number" id="visit-h" autocomplete="off" min="120" max="220" step="0.5" placeholder="ס״מ"></label>
   <details id="milestones"><summary>מועדים קדימה</summary><div class="ms-panel" id="ms-panel"></div></details>
-  <button type="button" id="visit-clear" title="מנקה את כל השדות, הבחירות ותוצאות המחשבונים. האתר אינו שומר פרטי מטופלת.">מטופלת חדשה</button>
+  <button type="button" id="visit-clear" title="מנקה את סרגל הביקור, בחירת הנושאים ותוצאות המחשבונים. האתר אינו שומר פרטי מטופלת.">מטופלת חדשה</button>
 </div>
 
 <div class="layout">
@@ -727,7 +713,7 @@
   <button class="btn-clear">נקה</button>
 </div>
 
-<script src="topics.enc.js?v=25"></script>
+<script src="topics.enc.js?v=26"></script>
 <script>
 /* ===== Login & decryption ===== */
 async function decryptTopics(encryptedB64, password, iterations) {
@@ -1839,149 +1825,23 @@ function initApp() {
   const overlay = document.getElementById('overlay');
   const menuToggle = document.getElementById('menu-toggle');
 
-  // ===== Visit (memory only) and fill-in fields =====
-  // Nothing here is stored: values live in these variables until "מטופלת חדשה" or a page reload.
+  // ===== Visit bar (memory only) =====
+  // Nothing here is stored: the values live in this object until "מטופלת חדשה" or a page reload.
   const visit = { edd: null, w: null, h: null };
-  const fills = new Map();      // key -> value typed by the doctor
-  const autoFills = new Map();  // key -> value derived from the visit bar (week, dates)
-  const fieldDefs = new Map();  // scope -> [defs] registered at render time
-
-  // bracket placeholders, or bare tokens preceded by start/space/punctuation (prefix captured, no lookbehind: older Safari)
-  const PH_RE = /\[([^\[\]\n]{1,240})\]|(^|[^\w֐-׿\[])(G_ P_ AB_ CS_ LC_|G_|DD\/MM\/YYYY|DD\.MM\.YYYY|XXXX|YYYY|XXX|XX\+[XY]|ZZ\+W|WW\+D|ZZZ|XX|YY|WW|X|_{2,})(?![\w+])/g;
-  // labels shared across all texts of the visit (identity and history only); everything else is per position
-  const SHARED = new Set(['שם', 'ת.ז.', 'שם ובן זוג', 'שם ושם בן הזוג', 'שם המטופלת ושם בן הזוג', 'תאריך לידה משוער', 'שם באנגלית כפי שבדרכון', 'תרופות', 'רגישויות', 'ניתוחים', 'אשפוזים', 'רקע משפחתי', 'פירוט הריונות קודמים', 'הריונות קודמים', 'טלפון', 'מספר ימים']);
-  const NESTED = /[XYZW]{2,}|DD[\/.]MM|_{2,}/;
-  const FILLER = /^(וכיו״ב|וכו׳|אחר|פירוט|details|other)$/;
-  const DATE_INNER = /^D+[\/.]M+[\/.]Y+$/;
   function fmtDate(d) { return `${String(d.getDate()).padStart(2, '0')}.${String(d.getMonth() + 1).padStart(2, '0')}.${d.getFullYear()}`; }
   function addDays(d, n) { const x = new Date(d); x.setDate(x.getDate() + n); return x; }
   function todayMidnight() { const d = new Date(); d.setHours(0, 0, 0, 0); return d; }
-
-  // before = the text just before the placeholder (used for the document-date header rule)
-  function makeDef(inner, bare, scope, idx, before) {
-    const def = { inner, bare, scope, idx, label: inner, options: null, key: `${scope}:${idx}`, optional: false };
-    before = before || '';
-    // [?phrase]: optional sentence, included unless switched off; [??phrase]: optional, off unless switched on
-    if (!bare && /^\?/.test(inner)) { def.optional = true; def.on = !/^\?\?/.test(inner); def.label = inner.replace(/^\?+/, '').trim(); }
-    if (!bare && !def.optional && !DATE_INNER.test(inner) && inner.includes('/')) {
-      const spaced = inner.includes(' / ');
-      let parts = (spaced ? inner.split(/\s+\/\s+/) : inner.split('/')).map(x => x.trim()).filter(Boolean);
-      const lm = parts.length ? /^([^:]{1,20}):\s*(.+)$/.exec(parts[0]) : null;
-      if (lm) { def.label = lm[1]; parts[0] = lm[2].trim(); }
-      parts = parts.filter(p => !FILLER.test(p));
-      const ok = parts.length >= 2 && parts.length <= 12 && parts.every(p => p.length <= 40 && !NESTED.test(p)) && (spaced || parts.every(p => p.length <= 12));
-      if (ok) def.options = parts; else def.label = inner;
-    }
-    const label = def.label.trim();
-    if (!bare && !def.options && SHARED.has(label)) def.key = 'k:' + label;
-    const header = /(^|\n)\s*(תאריך|Date|ייעוץ שר״פ)\s*:\s*$/.test(before) || /שמירת הריון מ-$/.test(before) || /היום, $/.test(before);
-    if (inner === 'DD/MM/YYYY' && header) def.auto = () => fmtDate(new Date()).replace(/\./g, '/');
-    if (inner === 'DD.MM.YYYY' && header) def.auto = () => fmtDate(new Date());
-    if (!bare && label === 'תאריך' && header) def.auto = () => fmtDate(new Date());
-    if ((bare && /^(ZZ\+W|WW\+D)$/.test(inner)) || (!bare && label === 'שבוע')) def.auto = () => visitGA() ? visitGA().str : '';
-    if (bare && inner === 'WW') def.auto = () => visitGA() ? String(visitGA().w) : '';
-    if (!bare && label === 'תאריך לידה משוער') def.auto = () => visit.edd ? fmtDate(visit.edd) : '';
-    return def;
-  }
-  function fillValue(def) {
-    if (fills.has(def.key)) return fills.get(def.key);
-    if (def.auto) { const v = def.auto(); if (v) return v; }
-    if (def.optional) return def.on ? def.label : '';
-    return '';
-  }
-  const fillSize = (v, label) => Math.max(3, Math.min(60, (v || label || '').length + 1));
-  function fieldify(text, scope) {
-    const defs = []; let idx = 0, out = '', last = 0; PH_RE.lastIndex = 0; let m;
-    while ((m = PH_RE.exec(text)) !== null) {
-      const pre = m[2] || '';
-      out += escapeHtml(text.slice(last, m.index) + pre); last = m.index + m[0].length;
-      const before = text.slice(Math.max(0, m.index - 40), m.index) + pre;
-      const def = makeDef(m[1] != null ? m[1] : m[3], m[1] == null, scope, idx++, before); defs.push(def);
-      const v = fillValue(def);
-      if (def.optional) {
-        out += `<button type="button" class="fill-opt${v ? ' on' : ''}" data-key="${escapeHtml(def.key)}" title="משפט אופציונלי: לחיצה מוסיפה או מסירה אותו מהטקסט">${escapeHtml(def.label)}</button>`;
-      } else if (def.options && !(fills.has(def.key) && !def.options.includes(v))) {
-        out += `<span class="fill-choice" data-key="${escapeHtml(def.key)}" title="${escapeHtml(def.label)}">` + def.options.map(o => `<button type="button" class="chip${o === v ? ' on' : ''}" data-v="${escapeHtml(o)}">${escapeHtml(o)}</button>`).join('') + '<button type="button" class="chip chip-other" data-v="__other__" title="טקסט חופשי במקום האפשרויות">✎</button></span>';
-      } else {
-        out += `<input class="fill" data-key="${escapeHtml(def.key)}" value="${escapeHtml(v)}" placeholder="${escapeHtml(def.label)}" size="${fillSize(v, def.label)}" aria-label="${escapeHtml(def.label)}" autocomplete="off" spellcheck="false">`;
-      }
-    }
-    out += escapeHtml(text.slice(last));
-    fieldDefs.set(scope, defs);
-    return out;
-  }
-  // blank (optional): what an unfilled placeholder becomes; by default it is left as written so the gap stays visible
-  function applyFills(text, scope, blank) {
-    const missing = []; let idx = 0, optOff = false; PH_RE.lastIndex = 0;
-    let res = text.replace(PH_RE, (all, inner, pre, bare, offset) => {
-      pre = pre || '';
-      const before = text.slice(Math.max(0, offset - 40), offset) + pre;
-      const def = makeDef(inner != null ? inner : bare, inner == null, scope, idx++, before);
-      const v = fillValue(def);
-      if (def.optional) { if (!v) optOff = true; return pre + v; } // never counted as missing
-      if (v) return pre + v;
-      missing.push(def.key); return blank != null ? pre + blank : all;
-    });
-    if (optOff) res = res.replace(/[ \t]{2,}/g, ' ').replace(/ ([,.;:])/g, '$1').replace(/^[ \t]+$/gm, '');
-    return { text: res, missing };
-  }
-  function markMissing(missing) {
-    let first = null;
-    missing.forEach(k => content.querySelectorAll(`.fill[data-key="${CSS.escape(k)}"], .fill-choice[data-key="${CSS.escape(k)}"]`).forEach(el => {
-      el.classList.add('fill-missing'); const det = el.closest('details'); if (det && !det.open) det.open = true; if (!first) first = el;
-    }));
-    if (first) { first.scrollIntoView({ block: 'center' }); const f = first.classList.contains('fill-choice') ? first.querySelector('.chip') : first; if (f) f.focus({ preventScroll: true }); }
-  }
-  const missingPrompt = (n) => n === 1 ? 'נותר שדה ריק אחד או בחירה שלא נבחרה. להמשיך בכל זאת?' : `נותרו ${n} שדות ריקים או בחירות שלא נבחרו. להמשיך בכל זאת?`;
-  function copyChecked(text, missing, btn) {
-    if (missing.length && !confirm(missingPrompt(missing.length))) { markMissing(missing); return; }
-    copyText(text, btn);
-  }
-  content.addEventListener('input', (e) => {
-    const el = e.target; if (!el.classList || !el.classList.contains('fill')) return;
-    const k = el.dataset.key; fills.set(k, el.value); el.classList.remove('fill-missing'); el.size = fillSize(el.value, el.placeholder);
-    content.querySelectorAll(`.fill[data-key="${CSS.escape(k)}"]`).forEach(o => { if (o !== el) { o.value = el.value; o.size = el.size; } });
-  });
-  // print: show typed values (or a blank line) instead of form controls
+  // Texts are copied exactly as written (the doctor edits placeholders in the medical record).
+  const fieldify = (text) => escapeHtml(text);
+  const applyFills = (text) => ({ text: text || '', missing: [] });
+  const copyChecked = (text, missing, btn) => copyText(text, btn);
+  // print: the patient handout carries the topic title instead of the site title
   let savedTitle = null;
   window.addEventListener('beforeprint', () => {
     if (document.body.classList.contains('patient-open')) { const h = document.querySelector('#patient-view h1'); if (h) { savedTitle = document.title; document.title = h.textContent; } }
-    document.querySelectorAll('.fill-print').forEach(e => e.remove());
-    content.querySelectorAll('.fill, .fill-choice, .fill-opt').forEach(el => {
-      const sp = document.createElement('span'); sp.className = 'fill-print';
-      let v = '';
-      if (el.classList.contains('fill')) v = el.value || '________';
-      else if (el.classList.contains('fill-opt')) v = el.classList.contains('on') ? el.textContent : '';
-      else { const on = el.querySelector('.chip.on'); v = on ? on.dataset.v : '________'; }
-      sp.textContent = v; el.insertAdjacentElement('afterend', sp);
-    });
   });
-  window.addEventListener('afterprint', () => {
-    document.querySelectorAll('.fill-print').forEach(e => e.remove());
-    if (savedTitle != null) { document.title = savedTitle; savedTitle = null; }
-  });
-  content.addEventListener('click', (e) => {
-    const opt = e.target.closest && e.target.closest('.fill-opt');
-    if (opt) {
-      const k = opt.dataset.key, on = !opt.classList.contains('on');
-      fills.set(k, on ? opt.textContent : '');
-      content.querySelectorAll(`.fill-opt[data-key="${CSS.escape(k)}"]`).forEach(o => o.classList.toggle('on', on));
-      return;
-    }
-    const chip = e.target.closest && e.target.closest('.fill-choice .chip'); if (!chip) return;
-    const k = chip.parentElement.dataset.key, v = chip.dataset.v;
-    if (v === '__other__') {
-      const on = chip.parentElement.querySelector('.chip.on'); const cur = on ? on.dataset.v : '';
-      fills.set(k, cur);
-      const inp = document.createElement('input'); inp.className = 'fill'; inp.dataset.key = k; inp.value = cur; inp.placeholder = 'טקסט חופשי'; inp.size = Math.max(8, cur.length + 2); inp.autocomplete = 'off'; inp.spellcheck = false;
-      chip.parentElement.replaceWith(inp); inp.focus(); inp.select();
-      return;
-    }
-    fills.set(k, v);
-    content.querySelectorAll(`.fill-choice[data-key="${CSS.escape(k)}"]`).forEach(g => { g.classList.remove('fill-missing'); g.querySelectorAll('.chip').forEach(c => c.classList.toggle('on', c.dataset.v === v)); });
-  });
+  window.addEventListener('afterprint', () => { if (savedTitle != null) { document.title = savedTitle; savedTitle = null; } });
 
-  // visit bar
   const vEdd = document.getElementById('visit-edd'), vGa = document.getElementById('visit-ga'), vW = document.getElementById('visit-w'), vH = document.getElementById('visit-h'), vNow = document.getElementById('visit-ga-now'), vBar = document.getElementById('visit-bar');
   function visitGA() {
     if (!visit.edd) return null;
@@ -1995,20 +1855,13 @@ function initApp() {
     vNow.textContent = ga ? `שבוע ${ga.str} היום` : '';
     vBar.classList.toggle('open', !!(visit.edd || visit.w || visit.h));
     renderMilestones();
-    // update week/date defaults in place (no re-render, so typing and open blocks are kept)
-    const seen = new Set();
-    fieldDefs.forEach(defs => defs.forEach(def => {
-      if (!def.auto || fills.has(def.key) || seen.has(def.key)) return; seen.add(def.key);
-      const v = def.auto();
-      content.querySelectorAll(`.fill[data-key="${CSS.escape(def.key)}"]`).forEach(el => { if (document.activeElement !== el) { el.value = v; el.size = fillSize(v, def.label); } });
-    }));
   }
   vEdd.addEventListener('change', () => { visit.edd = vEdd.value ? new Date(vEdd.value + 'T00:00:00') : null; if (visit.edd) vGa.value = (visitGA() || {}).str || ''; refreshVisit(); });
   vGa.addEventListener('change', () => { const g = parseGA(vGa.value); if (g) { visit.edd = addDays(todayMidnight(), 280 - (g.w * 7 + g.d)); vEdd.value = isoLocal(visit.edd); vGa.value = `${g.w}+${g.d}`; } else if (!vGa.value) { visit.edd = null; vEdd.value = ''; } else { showToast('פורמט שבוע: 32+4'); } refreshVisit(); });
   vW.addEventListener('change', () => { visit.w = parseFloat(vW.value) || null; refreshVisit(); });
   vH.addEventListener('change', () => { visit.h = parseFloat(vH.value) || null; refreshVisit(); });
   document.getElementById('visit-clear').addEventListener('click', () => {
-    visit.edd = null; visit.w = null; visit.h = null; fills.clear(); autoFills.clear(); extras.length = 0;
+    visit.edd = null; visit.w = null; visit.h = null; extras.length = 0;
     selected.clear(); persistSelection();
     vEdd.value = ''; vGa.value = ''; vW.value = ''; vH.value = '';
     if (closePatientView) closePatientView();
@@ -2458,7 +2311,6 @@ function initApp() {
     const r = take(topic.recommendations, topic.id + ':r').replace(/^(התוכנית כוללת|ממליץ על התוכנית הבאה):?\s*\n?/, '');
     const warn = !topic.is_us_finding && (topic.warnings_items || []).length;
     const wItems = warn ? topic.warnings_items.map((x, i) => take(x, topic.id + ':w' + i)) : [];
-    if (missing.length && !confirm(missingPrompt(missing.length))) { markMissing(missing); return; }
     const pts = topic.teach_points || [];
     const el = document.createElement('div'); el.id = 'patient-view'; el.setAttribute('role', 'dialog'); el.setAttribute('aria-label', 'תצוגה למטופלת');
     el.innerHTML = `<div class="pv-actions"><button type="button" class="bar-btn" id="pv-print">🖨 הדפס עלון</button><button type="button" class="bar-btn" id="pv-close">סגור (Esc)</button></div>
