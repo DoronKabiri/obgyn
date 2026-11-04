@@ -713,7 +713,7 @@
   <button class="btn-clear">נקה</button>
 </div>
 
-<script src="topics.enc.js?v=26"></script>
+<script src="topics.enc.js?v=27"></script>
 <script>
 /* ===== Login & decryption ===== */
 async function decryptTopics(encryptedB64, password, iterations) {
@@ -2487,6 +2487,12 @@ function initApp() {
         <div class="leave-note">בלוק נפרד לאישור שמירת הריון (לא נכלל ב"העתק את כל הטקסט").</div>
         <div class="block-content"><p style="white-space: pre-wrap;">${fieldify(topic.leave, topic.id + ':l')}</p></div>
       </details>` : '';
+    const extrasHtml = (topic.extra_blocks || []).map((b, n) => `
+      <details class="block block-leave">
+        <summary><span>${escapeHtml(b.title)}</span><button class="copy-btn" data-block="extra:${n}">העתק</button></summary>
+        ${b.note ? `<div class="leave-note">${escapeHtml(b.note)}</div>` : ''}
+        <div class="block-content"><p style="white-space: pre-wrap;">${fieldify(b.text, topic.id + ':x' + n)}</p></div>
+      </details>`).join('');
     const teachHtml = (topic.teachback || topic.teach_points) ? `
       <details class="teach-box">
         <summary>בדיקת הבנה בסוף השיחה (לרופא בלבד, לא מועתק)</summary>
@@ -2527,6 +2533,7 @@ function initApp() {
       </div>` : ''}
 
       ${leaveHtml}
+      ${extrasHtml}
 
       ${generalRecsHtml}
 
@@ -2558,6 +2565,7 @@ function initApp() {
         else if (which === 'discussion') r = applyFills(topic.discussion, topic.id + ':d');
         else if (which === 'recommendations') r = applyFills(topic.recommendations, topic.id + ':r');
         else if (which === 'leave') r = applyFills(topic.leave || '', topic.id + ':l');
+        else if (which.startsWith('extra:')) r = applyFills(((topic.extra_blocks || [])[+which.slice(6)] || {}).text || '', topic.id + ':x' + which.slice(6));
         else if (which === 'general') r = { text: generalRecsText(), missing: [] };
         else if (which === 'warnings') r = warningsFilled(topic);
         copyChecked(r.text, r.missing, btn);
